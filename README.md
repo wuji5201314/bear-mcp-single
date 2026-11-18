@@ -22,7 +22,7 @@
 | --- | --- |
 | 后端 | Java 17、Spring Boot 3.3、Spring AI 1.1（MCP Server）、MyBatis、Groovy 4 |
 | 存储 | MySQL 8、Redis（Token / 会话缓存）、TOS 或任意 S3 兼容对象存储（可选） |
-| 前端 | Vue 3、Ant Design Vue 4、Vite 6 |
+| 前端 | Vue 3、Vite 6、自建 shadcn 风格设计系统（无 UI 框架依赖，内置深浅色主题） |
 | 部署 | Docker 多阶段构建 + docker-compose + Jenkins Pipeline 示例 |
 
 ## 目录结构
