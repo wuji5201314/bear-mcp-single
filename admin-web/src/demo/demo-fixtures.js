@@ -55,10 +55,10 @@ export const audits = [
 ]
 
 export const builtinTools = [
-  { id: 'hello', name: 'hello', displayName: 'hello', description: '最小连通性测试工具', likeCount: 3 },
-  { id: 'current_time', name: 'current_time', displayName: 'current_time', description: '返回当前时间', likeCount: 3 },
-  { id: 'system_info', name: 'system_info', displayName: 'system_info', description: '返回运行环境信息', likeCount: 3 },
-  { id: 'list_dynamic_tools', name: 'list_dynamic_tools', displayName: 'list_dynamic_tools', description: '列出动态工具', likeCount: 3 }
+  { id: 'hello', name: 'hello', toolName: 'hello', displayName: 'hello', description: '最小连通性测试工具', likeCount: 3 },
+  { id: 'current_time', name: 'current_time', toolName: 'current_time', displayName: 'current_time', description: '返回当前时间', likeCount: 3 },
+  { id: 'system_info', name: 'system_info', toolName: 'system_info', displayName: 'system_info', description: '返回运行环境信息', likeCount: 3 },
+  { id: 'list_dynamic_tools', name: 'list_dynamic_tools', toolName: 'list_dynamic_tools', displayName: 'list_dynamic_tools', description: '列出动态工具', likeCount: 3 }
 ]
 
 export const dashboard = {
