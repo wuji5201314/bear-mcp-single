@@ -13,7 +13,7 @@ on:
         default: '60'
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   tunnel:
@@ -103,6 +103,18 @@ jobs:
             echo "This link stops working when the job ends."
           } >> "$GITHUB_STEP_SUMMARY"
           echo "demo url: $url"
+
+      - name: Publish URL to demo-live branch
+        run: |
+          cd "$GITHUB_WORKSPACE"
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git checkout --orphan demo-live
+          git rm -rf --cached . > /dev/null
+          printf '%s\n' "$DEMO_URL" > demo-url.txt
+          git add demo-url.txt
+          git commit -m "demo url: $DEMO_URL" > /dev/null
+          git push --force origin demo-live
 
       - name: Keep tunnel alive
         run: |
