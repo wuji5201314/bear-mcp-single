@@ -1,0 +1,90 @@
+server:
+  port: ${SERVER_PORT:8090}
+
+spring:
+  application:
+    name: bear-mcp-single
+  datasource:
+    url: ${BEAR_MYSQL_URL:jdbc:mysql://localhost:3306/bear_mcp_single?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: ${BEAR_MYSQL_USERNAME:root}
+    password: ${BEAR_MYSQL_PASSWORD:}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+  sql:
+    init:
+      mode: never
+  ai:
+    mcp:
+      server:
+        version: 0.1.0
+        protocol: STREAMABLE
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      password: ${REDIS_PASSWORD:}
+
+mybatis:
+  mapper-locations: classpath*:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+    log-impl: org.apache.ibatis.logging.nologging.NoLoggingImpl
+
+logging:
+  level:
+    root: INFO
+    com.bear.mcp.single: DEBUG
+    com.bear.mcp.single.core.mapper: WARN
+    org.mybatis: WARN
+    org.springframework.ai.mcp: INFO
+
+bear:
+  admin:
+    jwt-secret: ${BEAR_ADMIN_JWT_SECRET:change-me-in-production}
+    jwt-expire-seconds: ${BEAR_ADMIN_JWT_EXPIRE_SECONDS:7200}
+  mcp:
+    demo-token: ${BEAR_MCP_DEMO_TOKEN:mcp_dev_token}
+  storage:
+    tos:
+      endpoint: ${BEAR_TOS_ENDPOINT:tos-cn-shanghai.volces.com}
+      public-endpoint: ${BEAR_TOS_PUBLIC_ENDPOINT:tos-cn-shanghai.volces.com}
+      region: ${BEAR_TOS_REGION:cn-shanghai}
+      bucket: ${BEAR_TOS_BUCKET:xxx-bucket}
+      access-key: ${BEAR_TOS_ACCESS_KEY:}
+      secret-key: ${BEAR_TOS_SECRET_KEY:}
+      upload-expire-seconds: ${BEAR_TOS_UPLOAD_EXPIRE_SECONDS:600}
+  repository-command:
+    root: ${BEAR_REPOSITORY_ROOT:/data/repositories}
+    repositories:
+      xxx-admin: ${BEAR_XXX_ADMIN_REPOSITORY_DIRECTORY:xxx-admin}
+    timeout-seconds: ${BEAR_REPOSITORY_COMMAND_TIMEOUT_SECONDS:5}
+    max-output-lines: ${BEAR_REPOSITORY_COMMAND_MAX_OUTPUT_LINES:300}
+    max-output-bytes: ${BEAR_REPOSITORY_COMMAND_MAX_OUTPUT_BYTES:20000}
+
+xxx:
+  admin:
+    base-url: ${XXX_ADMIN_BASE_URL:http://127.0.0.1:8080}
+    shared-secret: ${XXX_BEAR_MCP_SHARED_SECRET:}
+
+# 注意：目录文件里的 ${TAVILY_API_KEY} 由 RequestConfigService 通过
+# System.getenv() 读取真正的进程环境变量，不会读取本文件，
+# 因此这里不再重复声明，避免造成“已在 yml 配好”的误解。
+
+feishu:
+  app-id: ${FEISHU_APP_ID:}
+  app-secret: ${FEISHU_APP_SECRET:}
+  token:
+    tenant-url: ${FEISHU_TENANT_TOKEN_URL:https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal}
+    redis-key: ${FEISHU_TENANT_TOKEN_REDIS_KEY:bear:mcp:feishu:tenant-access-token}
+  mcp:
+    url: ${FEISHU_MCP_URL:https://mcp.feishu.cn/mcp}
+    # TAT 表示 Bear 用应用身份调用飞书 MCP。UAT 需要额外接用户 OAuth 授权流程。
+    credential-type: ${FEISHU_MCP_CREDENTIAL_TYPE:TAT}
+
+volcengine:
+  tls:
+    endpoint: ${VOLCENGINE_ENDPOINT:https://tls-cn-shanghai.volces.com}
+    region: ${VOLCENGINE_REGION:cn-shanghai}
+    access-key-id: ${VOLCENGINE_ACCESS_KEY_ID:}
+    access-key-secret: ${VOLCENGINE_ACCESS_KEY_SECRET:}
+    security-token: ${VOLCENGINE_TOKEN:}
+    topic-id: ${VOLCENGINE_TLS_TOPIC_ID:}

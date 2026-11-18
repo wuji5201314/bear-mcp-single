@@ -1,0 +1,26 @@
+[
+  {
+    "skillCode": "SKILL0000000005",
+    "name": "demo-log-analysis",
+    "description": "线上日志与故障排查方法论示例：给定 traceId、业务单号或错误信息，输出结构化排查结论。仅作技能包结构演示，不含任何真实系统信息。",
+    "category": "研发工具",
+    "objectKey": "skills/SKILL0000000005/SKILL.md",
+    "fileName": "SKILL.md",
+    "fileSize": 1993,
+    "creatorId": null,
+    "enabled": 1,
+    "publishStatus": 2
+  },
+  {
+    "skillCode": "SKILL0000000001",
+    "name": "demo-policy-qa",
+    "description": "制度问答示例技能：演示「只登记元数据、正文由后台补充」的状态，此时技能不可发布、模型无法读取正文。",
+    "category": "通用问答",
+    "objectKey": "skills/SKILL0000000001/SKILL.md",
+    "fileName": "SKILL.md",
+    "fileSize": 0,
+    "creatorId": null,
+    "enabled": 0,
+    "publishStatus": 0
+  }
+]

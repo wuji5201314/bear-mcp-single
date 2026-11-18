@@ -1,0 +1,22 @@
+services:
+  bear-mcp-single:
+    image: ${BEAR_MCP_SINGLE_IMAGE:-bear-mcp-single:latest}
+    container_name: bear-mcp-single
+    restart: unless-stopped
+    ports:
+      - "8090:8090"
+    env_file:
+      - .env
+    environment:
+      TZ: Asia/Shanghai
+      SERVER_PORT: 8090
+      SPRING_PROFILES_ACTIVE: prod
+      JAVA_OPTS: ${JAVA_OPTS:--Xms256m -Xmx768m}
+    volumes:
+      - /data/repositories:/data/repositories:ro
+    networks:
+      - xxx-network
+
+networks:
+  xxx-network:
+    external: true

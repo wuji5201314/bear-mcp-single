@@ -1,0 +1,41 @@
+[
+  {
+    "toolName": "echo_dynamic",
+    "toolDescription": "动态工具示例：回显输入参数，并演示通过 runRequest 调用白名单请求配置。",
+    "inputSchema": "{\"type\":\"object\",\"properties\":{\"message\":{\"type\":\"string\",\"description\":\"要回显的内容\"}},\"required\":[\"message\"]}",
+    "groovyScript": "if(!params.message) throw new IllegalArgumentException(\"message 不能为空\")\ndef clock = runRequest.runRequest(\"demo_clock\", [message: params.message])\nreturn [\n  message: params.message,\n  currentUser: userName,\n  clock: clock\n]",
+    "linkedRequestKeys": "[\"demo_clock\"]",
+    "linkedDataSourceIds": "[]",
+    "linkedFeishuToolNames": null,
+    "linkedRemoteCredentials": null,
+    "linkedMcpKeys": null,
+    "enabled": 1,
+    "publishStatus": 2
+  },
+  {
+    "toolName": "demo_user_lookup",
+    "toolDescription": "动态工具示例：调用 demo_user_detail 请求配置按 userId 查询用户详情，返回原始响应。",
+    "inputSchema": "{\"type\":\"object\",\"properties\":{\"userId\":{\"type\":\"string\",\"description\":\"用户 ID，例如 1001\"}},\"required\":[\"userId\"]}",
+    "groovyScript": "def userId = params.userId?.toString()?.trim()\nif(!userId) throw new IllegalArgumentException(\"userId 不能为空\")\ndef detail = runRequest.runRequest(\"demo_user_detail\", [userId: userId])\nreturn [\n  userId: userId,\n  detail: detail\n]",
+    "linkedRequestKeys": "[\"demo_user_detail\"]",
+    "linkedDataSourceIds": "[]",
+    "linkedFeishuToolNames": null,
+    "linkedRemoteCredentials": null,
+    "linkedMcpKeys": null,
+    "enabled": 1,
+    "publishStatus": 2
+  },
+  {
+    "toolName": "demo_order_search",
+    "toolDescription": "动态工具示例：调用 demo_order_search 请求配置按关键词分页搜索订单。",
+    "inputSchema": "{\"type\":\"object\",\"properties\":{\"keyword\":{\"type\":\"string\",\"description\":\"搜索关键词\"},\"page\":{\"type\":\"integer\",\"description\":\"页码，从 1 开始\",\"default\":1},\"size\":{\"type\":\"integer\",\"description\":\"每页条数\",\"default\":10}},\"required\":[\"keyword\"]}",
+    "groovyScript": "def keyword = params.keyword?.toString()?.trim()\nif(!keyword) throw new IllegalArgumentException(\"keyword 不能为空\")\ndef page = params.page == null ? 1 : params.page.toString().toInteger()\ndef size = params.size == null ? 10 : params.size.toString().toInteger()\ndef result = runRequest.runRequest(\"demo_order_search\", [keyword: keyword, page: page, size: size])\nreturn [\n  keyword: keyword,\n  page: page,\n  size: size,\n  result: result\n]",
+    "linkedRequestKeys": "[\"demo_order_search\"]",
+    "linkedDataSourceIds": "[]",
+    "linkedFeishuToolNames": null,
+    "linkedRemoteCredentials": null,
+    "linkedMcpKeys": null,
+    "enabled": 1,
+    "publishStatus": 2
+  }
+]

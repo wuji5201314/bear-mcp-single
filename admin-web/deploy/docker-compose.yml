@@ -1,0 +1,19 @@
+services:
+  bear-mcp-admin-web:
+    image: ${BEAR_MCP_ADMIN_WEB_IMAGE:-bear-mcp-admin-web:latest}
+    container_name: bear-mcp-admin-web
+    restart: unless-stopped
+    ports:
+      - "8091:80"
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--spider", "http://127.0.0.1/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    networks:
+      - xxx-network
+
+networks:
+  xxx-network:
+    external: true
