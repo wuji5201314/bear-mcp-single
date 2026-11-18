@@ -23,6 +23,9 @@ concurrency:
 jobs:
   build:
     name: Build demo bundle
+    # GitHub Pages is unavailable for private repositories on the free plan, so
+    # this job stays idle until the repository sets the ENABLE_PAGES variable.
+    if: vars.ENABLE_PAGES == 'true'
     runs-on: ubuntu-latest
     defaults:
       run:
