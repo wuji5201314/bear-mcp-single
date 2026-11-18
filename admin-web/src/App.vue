@@ -1,13 +1,33 @@
 <script setup>
-import { computed, h, onMounted, onUnmounted, ref, watch } from 'vue'
-import { message } from 'ant-design-vue'
+import { computed, onMounted, onUnmounted, ref, watch } from 'vue'
 import { ADMIN_TOKEN_KEY, UNAUTHORIZED_EVENT, api } from './api'
 import LoginView from './LoginView.vue'
-import { AppstoreOutlined, AuditOutlined, KeyOutlined, RocketOutlined, SettingOutlined, TeamOutlined, ThunderboltOutlined, PlusOutlined, SearchOutlined, BellOutlined, DatabaseOutlined, SafetyCertificateOutlined, HomeOutlined, LogoutOutlined } from '@ant-design/icons-vue'
+import Icon from './ui/Icon.vue'
+import ToastHost from './ui/ToastHost.vue'
+import { toast } from './ui/toast'
 
 const page = ref(pageFromPath())
 const loggedIn = ref(Boolean(localStorage.getItem(ADMIN_TOKEN_KEY)))
 const loading = ref(false)
+const sidebarCollapsed = ref(localStorage.getItem('bear_mcp_admin_sidebar') === 'collapsed')
+const theme = ref(localStorage.getItem('bear_mcp_admin_theme') || 'dark')
+const navQuery = ref('')
+
+function applyTheme() {
+  document.documentElement.classList.toggle('dark', theme.value === 'dark')
+  localStorage.setItem('bear_mcp_admin_theme', theme.value)
+}
+
+function toggleTheme() {
+  theme.value = theme.value === 'dark' ? 'light' : 'dark'
+}
+
+function toggleSidebar() {
+  sidebarCollapsed.value = !sidebarCollapsed.value
+  localStorage.setItem('bear_mcp_admin_sidebar', sidebarCollapsed.value ? 'collapsed' : 'expanded')
+}
+
+watch(theme, applyTheme, { immediate: true })
 const rows = ref([])
 const dashboard = ref({})
 const roles = ref([])
@@ -136,7 +156,8 @@ const activeStatusOptions = [
   { label: '禁用', value: 0 }
 ]
 const requestTypeOptions = [
-  { label: 'HTTP', value: 'HTTP' }
+  { label: 'HTTP', value: 'HTTP' },
+  { label: 'MOCK', value: 'MOCK' }
 ]
 const httpMethodOptions = [
   { label: 'GET', value: 'GET' },
@@ -158,8 +179,8 @@ const dataSourcePublishStatusOptions = [
   { label: '已发布', value: 1 }
 ]
 const menu = [
-  ['dashboard', '概览', AppstoreOutlined], ['users', '用户', TeamOutlined], ['roles', '角色与能力权限', TeamOutlined], ['tokens', 'Token 与能力选择', KeyOutlined],
-  ['requests', '请求配置', SettingOutlined], ['dataSources', '数据源', DatabaseOutlined], ['resources', '资源', DatabaseOutlined], ['tools', '动态工具', ThunderboltOutlined], ['audits', '审计日志', AuditOutlined]
+  ['dashboard', '概览', 'dashboard'], ['users', '用户', 'users'], ['roles', '角色与能力权限', 'shield'], ['tokens', 'Token 与能力选择', 'key'],
+  ['requests', '请求配置', 'settings'], ['dataSources', '数据源', 'database'], ['resources', '资源', 'layers'], ['tools', '动态工具', 'zap'], ['audits', '审计日志', 'activity']
 ]
 const communityPages = ['shareHome', 'shareSkills', 'shareTools', 'sharePrompts', 'shareResources', 'shareApis', 'shareConfig', 'shareTokens']
 const studioPages = ['studioHome', 'studioSkills', 'studioSkillEdit', 'studioTools', 'studioToolEdit', 'studioPrompts', 'studioPromptEdit', 'studioResources', 'studioResourceEdit', 'studioApis', 'studioApiEdit']
@@ -536,6 +557,17 @@ const dataColumns = computed(() => columns.value.map(([dataIndex,title]) => ({
   customRender: ({ text, record }) => formatTableCell(dataIndex, text, record)
 })))
 
+const tableQuery = ref('')
+const tableRows = computed(() => {
+  const keyword = tableQuery.value.trim().toLowerCase()
+  if (!keyword) {
+    return rows.value
+  }
+  return rows.value.filter(row => String(formatTableCell(columns.value[0]?.[0], row[columns.value[0]?.[0]], row) || '')
+    .toLowerCase()
+    .includes(keyword) || Object.values(row).some(value => String(value ?? '').toLowerCase().includes(keyword)))
+})
+
 function pageFromPath() {
   const path = window.location.pathname
   if (path === '/share/studio/skills') {
@@ -779,7 +811,7 @@ function likeLabel(item) {
 
 async function toggleCommunityLike(item) {
   if (!item?.likeTargetType || !item?.likeTargetKey) {
-    message.warning('这个能力暂时不能点赞')
+    toast.warning('这个能力暂时不能点赞')
     return
   }
   try {
@@ -792,7 +824,7 @@ async function toggleCommunityLike(item) {
     })
     applyCommunityLikeResult(result)
   } catch (error) {
-    message.error(error.message || '点赞失败')
+    toast.error(error.message || '点赞失败')
   }
 }
 
@@ -842,7 +874,7 @@ async function loadCommunityHomeData() {
     .map((item, index) => item.status === 'rejected' ? requests[index][0] : null)
     .filter(Boolean)
   if (failed.length) {
-    message.warning(`部分社区数据加载失败：${failed.join('、')}`)
+    toast.warning(`部分社区数据加载失败：${failed.join('、')}`)
   }
 }
 
@@ -889,7 +921,7 @@ function applyConfigTokenSelections() {
 
 async function saveShareMcpConfig() {
   if (!activeConfigTokenId.value) {
-    message.warning('请先选择 Token')
+    toast.warning('请先选择 Token')
     return
   }
   const tools = selectedTokenTools.value.map(toolName => ({
@@ -904,13 +936,13 @@ async function saveShareMcpConfig() {
     api(`/api/share/tokens/${activeConfigTokenId.value}/prompt-selections`, { method: 'PUT', body: { prompts } }),
     api(`/api/share/tokens/${activeConfigTokenId.value}/resource-selections`, { method: 'PUT', body: { resources } })
   ])
-  message.success('MCP 配置已保存')
+  toast.success('MCP 配置已保存')
   await loadShareConfigData()
 }
 
 async function installShareConfigToCursor() {
   if (!activeConfigTokenId.value) {
-    message.warning('请先选择 Token')
+    toast.warning('请先选择 Token')
     return
   }
   await saveShareMcpConfig()
@@ -1194,7 +1226,7 @@ async function load() {
   } catch (error) {
     if (loggedIn.value) {
       console.error(error)
-      message.error(`${title.value}加载失败：${error.message || '请求失败'}`)
+      toast.error(`${title.value}加载失败：${error.message || '请求失败'}`)
     }
   } finally { loading.value = false }
 }
@@ -1420,9 +1452,9 @@ async function copyRawToken() {
       document.execCommand('copy')
       document.body.removeChild(textarea)
     }
-    message.success('Token 已复制')
+    toast.success('Token 已复制')
   } catch (error) {
-    message.error('复制失败，请手动选中 Token 复制')
+    toast.error('复制失败，请手动选中 Token 复制')
   }
 }
 
@@ -1439,7 +1471,7 @@ async function removeRow(record) {
     return
   }
   await api(`/data-sources/${record.id}`, { method: 'DELETE' })
-  message.success('已删除数据源')
+  toast.success('已删除数据源')
   await load()
 }
 async function testDataSourceConnection() {
@@ -1451,7 +1483,7 @@ async function testDataSourceConnection() {
     const body = buildSaveBody()
     const url = model.value.id ? `/data-sources/${model.value.id}/test-connection` : '/data-sources/test-connection'
     await api(url, { method: 'POST', body })
-    message.success('数据源连接成功')
+    toast.success('数据源连接成功')
   } finally {
     dataSourceTesting.value = false
   }
@@ -1716,7 +1748,7 @@ function extractPromptArgumentsFromTemplate() {
   }
   updatePromptArguments(args)
   promptPreviewArgs.value = buildPromptPreviewArgs()
-  message.success('已从模板提取参数')
+  toast.success('已从模板提取参数')
 }
 
 function buildPromptPreviewArgs() {
@@ -1841,7 +1873,7 @@ function generateToolAssetsFromDataSourceSelection() {
 function generateToolSchemaFromScript() {
   const entries = collectScriptParamEntries(model.value.groovyScript)
   if (!entries.length) {
-    message.warning('没有识别到 params.xxx 参数')
+    toast.warning('没有识别到 params.xxx 参数')
     return
   }
 
@@ -1873,7 +1905,7 @@ function generateToolSchemaFromScript() {
 
   model.value.inputSchema = JSON.stringify(nextSchema, null, 2)
   toolDebugParams.value = JSON.stringify(buildScriptDebugParams(entries), null, 2)
-  message.success(`已生成 ${entries.length} 个入参`)
+  toast.success(`已生成 ${entries.length} 个入参`)
 }
 
 function generateToolDebugParamsFromSelection() {
@@ -2359,7 +2391,7 @@ async function saveTokenResourceSelections() {
 async function toggleResourceEnabled(resource) {
   const enabled = Number(resource.enabled) === 1
   await api(`/resources/${resource.id}/${enabled ? 'disable' : 'enable'}`, { method: 'POST' })
-  message.success(enabled ? 'Resource 已禁用' : 'Resource 已启用')
+  toast.success(enabled ? 'Resource 已禁用' : 'Resource 已启用')
   await load()
 }
 function showDynamicToolDetail(tool) {
@@ -2402,10 +2434,10 @@ async function runApiDebug() {
       method: 'POST',
       body: { params }
     })
-    message.success('调试成功')
+    toast.success('调试成功')
   } catch (error) {
     debugResult.value = error.data || { success: false, errorMessage: error.message }
-    message.error(debugResult.value.errorMessage || error.message || '调试失败')
+    toast.error(debugResult.value.errorMessage || error.message || '调试失败')
   } finally {
     debugLoading.value = false
   }
@@ -2420,10 +2452,10 @@ async function saveApiEditor() {
       body: buildSaveBody()
     })
     model.value = { ...model.value, ...result }
-    message.success(model.value.id ? 'API 已保存' : 'API 已创建')
+    toast.success(model.value.id ? 'API 已保存' : 'API 已创建')
     return result
   } catch (error) {
-    message.error(error.message || '保存失败')
+    toast.error(error.message || '保存失败')
     throw error
   } finally {
     apiSaving.value = false
@@ -2437,10 +2469,10 @@ async function sendApiEditor() {
       method: 'POST',
       body: { ...buildSaveBody(), params }
     })
-    message.success('调试成功')
+    toast.success('调试成功')
   } catch (error) {
     debugResult.value = error.data || { success: false, errorMessage: error.message }
-    message.error(debugResult.value.errorMessage || error.message || '调试失败')
+    toast.error(debugResult.value.errorMessage || error.message || '调试失败')
   } finally {
     debugLoading.value = false
   }
@@ -2455,10 +2487,10 @@ async function saveToolEditor() {
       body: buildSaveBody()
     })
     model.value = { ...model.value, ...result }
-    message.success(model.value.id ? 'Tool 已保存' : 'Tool 已创建')
+    toast.success(model.value.id ? 'Tool 已保存' : 'Tool 已创建')
     return result
   } catch (error) {
-    message.error(error.message || '保存失败')
+    toast.error(error.message || '保存失败')
     throw error
   } finally {
     toolSaving.value = false
@@ -2472,10 +2504,10 @@ async function sendToolEditor() {
       method: 'POST',
       body: { params, tool: buildSaveBody() }
     })
-    message.success('调试成功')
+    toast.success('调试成功')
   } catch (error) {
     toolDebugResult.value = error.data || { success: false, errorMessage: error.message }
-    message.error(toolDebugResult.value.errorMessage || error.message || '调试失败')
+    toast.error(toolDebugResult.value.errorMessage || error.message || '调试失败')
   } finally {
     toolDebugLoading.value = false
   }
@@ -2490,10 +2522,10 @@ async function savePromptEditor() {
       body: buildSaveBody()
     })
     model.value = { ...model.value, ...result }
-    message.success(model.value.id ? 'Prompt 已保存' : 'Prompt 已创建')
+    toast.success(model.value.id ? 'Prompt 已保存' : 'Prompt 已创建')
     return result
   } catch (error) {
-    message.error(error.message || '保存失败')
+    toast.error(error.message || '保存失败')
     throw error
   } finally {
     promptSaving.value = false
@@ -2508,10 +2540,10 @@ async function previewPromptEditor() {
       method: 'POST',
       body: { arguments: args, prompt: buildSaveBody() }
     })
-    message.success('预览已生成')
+    toast.success('预览已生成')
   } catch (error) {
     promptPreviewResult.value = { success: false, errorMessage: error.message }
-    message.error(error.message || '预览失败')
+    toast.error(error.message || '预览失败')
   } finally {
     promptPreviewLoading.value = false
   }
@@ -2522,7 +2554,7 @@ async function publishPrompt(prompt) {
   if (model.value.id === prompt.id) {
     model.value = { ...model.value, ...result }
   }
-  message.success('Prompt 已公开发布')
+  toast.success('Prompt 已公开发布')
   await load()
 }
 
@@ -2531,7 +2563,7 @@ async function publishPrivatePrompt(prompt) {
   if (model.value.id === prompt.id) {
     model.value = { ...model.value, ...result }
   }
-  message.success('Prompt 已设为不公开')
+  toast.success('Prompt 已设为不公开')
   await load()
 }
 
@@ -2540,7 +2572,7 @@ async function unpublishPrompt(prompt) {
   if (model.value.id === prompt.id) {
     model.value = { ...model.value, ...result }
   }
-  message.success('Prompt 已下线')
+  toast.success('Prompt 已下线')
   await load()
 }
 
@@ -2554,7 +2586,7 @@ async function toggleOnlinePrompt(prompt) {
 
 async function toggleVisibilityPrompt(prompt) {
   if (Number(prompt.publishStatus) === 0) {
-    message.warning('先上线，再设置公开范围')
+    toast.warning('先上线，再设置公开范围')
     return
   }
   if (Number(prompt.publishStatus) === 2) {
@@ -2570,7 +2602,7 @@ async function onSkillFileChange(event) {
     return
   }
   if (!file.name.toLowerCase().endsWith('.md')) {
-    message.warning('Skill 当前只支持 Markdown (.md) 文件')
+    toast.warning('Skill 当前只支持 Markdown (.md) 文件')
     event.target.value = ''
     skillSelectedFile.value = null
     return
@@ -2644,7 +2676,7 @@ function buildCodexSkillInstallCommand(skill) {
 function openCursorSkillInstall(skill) {
   const skillCode = skill?.skillCode || model.value.skillCode
   if (!skillCode || Number(skill?.publishStatus ?? model.value.publishStatus) === 0) {
-    message.warning('请先上线 Skill，再安装到 Cursor')
+    toast.warning('请先上线 Skill，再安装到 Cursor')
     return
   }
   const prompt = encodeURIComponent(buildCursorSkillInstallPrompt(skill))
@@ -2659,22 +2691,22 @@ function openCursorSkillInstall(skill) {
 async function copyCodexSkillInstall(skill) {
   const skillCode = skill?.skillCode || model.value.skillCode
   if (!skillCode || Number(skill?.publishStatus ?? model.value.publishStatus) === 0) {
-    message.warning('请先上线 Skill，再安装到 Codex')
+    toast.warning('请先上线 Skill，再安装到 Codex')
     return
   }
   const command = buildCodexSkillInstallCommand(skill)
   try {
     await navigator.clipboard.writeText(command)
-    message.success('Codex 安装命令已复制到剪贴板，请在终端执行')
+    toast.success('Codex 安装命令已复制到剪贴板，请在终端执行')
   } catch (error) {
-    message.info(command)
+    toast.info(command)
   }
 }
 
 function downloadSkillZip(skill) {
   const skillCode = skill?.skillCode || model.value.skillCode
   if (!skillCode || Number(skill?.publishStatus ?? model.value.publishStatus) === 0) {
-    message.warning('请先上线 Skill，再下载 ZIP')
+    toast.warning('请先上线 Skill，再下载 ZIP')
     return
   }
   window.open(`${skillInstallBaseUrl()}/api/public/skills/${encodeURIComponent(skillCode)}/download`, '_blank')
@@ -2739,10 +2771,10 @@ async function saveSkillEditor() {
     })
     model.value = { ...model.value, ...result }
     await loadSkillPreview(result.id)
-    message.success(model.value.id ? 'Skill 已保存' : 'Skill 已创建')
+    toast.success(model.value.id ? 'Skill 已保存' : 'Skill 已创建')
     return result
   } catch (error) {
-    message.error(error.message || '保存失败')
+    toast.error(error.message || '保存失败')
     throw error
   } finally {
     skillSaving.value = false
@@ -2754,7 +2786,7 @@ async function publishSkill(skill) {
   if (model.value.id === skill.id) {
     model.value = { ...model.value, ...result }
   }
-  message.success('Skill 已公开发布')
+  toast.success('Skill 已公开发布')
   await load()
 }
 
@@ -2763,7 +2795,7 @@ async function publishPrivateSkill(skill) {
   if (model.value.id === skill.id) {
     model.value = { ...model.value, ...result }
   }
-  message.success('Skill 已设为不公开')
+  toast.success('Skill 已设为不公开')
   await load()
 }
 
@@ -2772,7 +2804,7 @@ async function unpublishSkill(skill) {
   if (model.value.id === skill.id) {
     model.value = { ...model.value, ...result }
   }
-  message.success('Skill 已下线')
+  toast.success('Skill 已下线')
   await load()
 }
 
@@ -2786,7 +2818,7 @@ async function toggleOnlineSkill(skill) {
 
 async function toggleVisibilitySkill(skill) {
   if (Number(skill.publishStatus) === 0) {
-    message.warning('先上线，再设置公开范围')
+    toast.warning('先上线，再设置公开范围')
     return
   }
   if (Number(skill.publishStatus) === 2) {
@@ -2802,7 +2834,7 @@ async function onResourceFileChange(event) {
     return
   }
   if (!file.name.toLowerCase().endsWith('.md')) {
-    message.warning('Resource 当前只支持 Markdown (.md) 文件')
+    toast.warning('Resource 当前只支持 Markdown (.md) 文件')
     event.target.value = ''
     resourceSelectedFile.value = null
     return
@@ -2877,10 +2909,10 @@ async function saveResourceEditor() {
     })
     model.value = { ...model.value, ...result }
     await loadResourcePreview(result.id)
-    message.success(model.value.id ? 'Resource 已保存' : 'Resource 已创建')
+    toast.success(model.value.id ? 'Resource 已保存' : 'Resource 已创建')
     return result
   } catch (error) {
-    message.error(error.message || '保存失败')
+    toast.error(error.message || '保存失败')
     throw error
   } finally {
     resourceSaving.value = false
@@ -2892,7 +2924,7 @@ async function publishResource(resource) {
   if (model.value.id === resource.id) {
     model.value = { ...model.value, ...result }
   }
-  message.success('Resource 已公开发布')
+  toast.success('Resource 已公开发布')
   await load()
 }
 
@@ -2901,7 +2933,7 @@ async function publishPrivateResource(resource) {
   if (model.value.id === resource.id) {
     model.value = { ...model.value, ...result }
   }
-  message.success('Resource 已设为不公开')
+  toast.success('Resource 已设为不公开')
   await load()
 }
 
@@ -2910,7 +2942,7 @@ async function unpublishResource(resource) {
   if (model.value.id === resource.id) {
     model.value = { ...model.value, ...result }
   }
-  message.success('Resource 已下线')
+  toast.success('Resource 已下线')
   await load()
 }
 
@@ -2924,7 +2956,7 @@ async function toggleOnlineResource(resource) {
 
 async function toggleVisibilityResource(resource) {
   if (Number(resource.publishStatus) === 0) {
-    message.warning('先上线，再设置公开范围')
+    toast.warning('先上线，再设置公开范围')
     return
   }
   if (Number(resource.publishStatus) === 2) {
@@ -2938,7 +2970,7 @@ async function publishTool(tool) {
   if (model.value.id === tool.id) {
     model.value = { ...model.value, ...result }
   }
-  message.success('Tool 已公开发布')
+  toast.success('Tool 已公开发布')
   await load()
 }
 async function publishPrivateTool(tool) {
@@ -2946,7 +2978,7 @@ async function publishPrivateTool(tool) {
   if (model.value.id === tool.id) {
     model.value = { ...model.value, ...result }
   }
-  message.success('Tool 已设为不公开')
+  toast.success('Tool 已设为不公开')
   await load()
 }
 async function unpublishTool(tool) {
@@ -2954,7 +2986,7 @@ async function unpublishTool(tool) {
   if (model.value.id === tool.id) {
     model.value = { ...model.value, ...result }
   }
-  message.success('Tool 已下线')
+  toast.success('Tool 已下线')
   await load()
 }
 async function toggleOnlineTool(tool) {
@@ -2967,7 +2999,7 @@ async function toggleOnlineTool(tool) {
 }
 async function toggleVisibilityTool(tool) {
   if (Number(tool.publishStatus) === 0) {
-    message.warning('先上线，再设置公开范围')
+    toast.warning('先上线，再设置公开范围')
     return
   }
   if (Number(tool.publishStatus) === 2) {
@@ -2979,17 +3011,17 @@ async function toggleVisibilityTool(tool) {
 }
 async function publishApi(apiConfig) {
   await api(`/api/share/studio/apis/${apiConfig.id}/publish`, { method: 'POST' })
-  message.success('已公开发布')
+  toast.success('已公开发布')
   await load()
 }
 async function publishPrivateApi(apiConfig) {
   await api(`/api/share/studio/apis/${apiConfig.id}/publish-private`, { method: 'POST' })
-  message.success('已设为不公开')
+  toast.success('已设为不公开')
   await load()
 }
 async function unpublishApi(apiConfig) {
   await api(`/api/share/studio/apis/${apiConfig.id}/unpublish`, { method: 'POST' })
-  message.success('已下架为草稿')
+  toast.success('已下架为草稿')
   await load()
 }
 async function toggleOnlineApi(apiConfig) {
@@ -3002,7 +3034,7 @@ async function toggleOnlineApi(apiConfig) {
 }
 async function toggleVisibilityApi(apiConfig) {
   if (Number(apiConfig.publishStatus) === 0) {
-    message.warning('先上线，再设置公开范围')
+    toast.warning('先上线，再设置公开范围')
     return
   }
   if (Number(apiConfig.publishStatus) === 2) {
@@ -3061,2319 +3093,1868 @@ function loginSuccess() {
   load()
 }
 </script>
-
 <template>
   <LoginView v-if="!loggedIn" @success="loginSuccess" />
-  <template v-else>
-  <a-config-provider :theme="{ token: { colorPrimary: '#8b5cf6', borderRadius: 8, fontFamily: 'Inter, PingFang SC, Microsoft YaHei, sans-serif' } }">
-  <template v-if="isSharePage">
-    <div class="share-shell">
-      <nav class="hub-nav">
-        <div class="hub-nav-inner">
-          <div v-if="isCommunityPage" class="hub-nav-tabs">
-            <a class="hub-logo" @click.prevent="changePage('shareHome')"><AppstoreOutlined />Bear 社区</a>
-            <a :class="['hub-nav-tab', page === 'shareHome' ? 'active' : '']" @click.prevent="changePage('shareHome')">首页</a>
-            <a :class="['hub-nav-tab', page === 'shareSkills' ? 'active' : '']" @click.prevent="changePage('shareSkills')">Skills 社区</a>
-            <a :class="['hub-nav-tab', page === 'shareTools' ? 'active' : '']" @click.prevent="changePage('shareTools')">MCP Tools</a>
-            <a :class="['hub-nav-tab', page === 'sharePrompts' ? 'active' : '']" @click.prevent="changePage('sharePrompts')">MCP Prompts</a>
-            <a :class="['hub-nav-tab', page === 'shareResources' ? 'active' : '']" @click.prevent="changePage('shareResources')">MCP Resources</a>
-            <a :class="['hub-nav-tab', page === 'shareApis' ? 'active' : '']" @click.prevent="changePage('shareApis')">API 能力</a>
-            <a :class="['hub-nav-tab', page === 'shareConfig' ? 'active' : '']" @click.prevent="changePage('shareConfig')">我的MCP配置</a>
-            <a :class="['hub-nav-tab', page === 'shareTokens' ? 'active' : '']" @click.prevent="changePage('shareTokens')">Token 管理</a>
-          </div>
-          <div v-else class="hub-nav-tabs">
-            <a class="hub-logo" @click.prevent="changePage('studioHome')"><RocketOutlined />Bear 创作空间</a>
-            <a :class="['hub-nav-tab', page === 'studioHome' ? 'active' : '']" @click.prevent="changePage('studioHome')">首页</a>
-            <a :class="['hub-nav-tab', ['studioSkills','studioSkillEdit'].includes(page) ? 'active' : '']" @click.prevent="changePage('studioSkills')">Skills 创作</a>
-            <a :class="['hub-nav-tab', ['studioTools','studioToolEdit'].includes(page) ? 'active' : '']" @click.prevent="changePage('studioTools')">Tools 创作</a>
-            <a :class="['hub-nav-tab', ['studioPrompts','studioPromptEdit'].includes(page) ? 'active' : '']" @click.prevent="changePage('studioPrompts')">Prompts 创作</a>
-            <a :class="['hub-nav-tab', ['studioResources','studioResourceEdit'].includes(page) ? 'active' : '']" @click.prevent="changePage('studioResources')">Resources 创作</a>
-            <a :class="['hub-nav-tab', ['studioApis','studioApiEdit'].includes(page) ? 'active' : '']" @click.prevent="changePage('studioApis')">API 创作</a>
-          </div>
-          <div class="hub-nav-right">
-            <span class="hub-nav-user">demo-admin</span>
-            <a v-if="isCommunityPage" class="hub-nav-link" @click.prevent="changePage('studioHome')"><RocketOutlined />创作空间</a>
-            <a v-else class="hub-nav-link" @click.prevent="changePage('shareHome')"><HomeOutlined />返回社区</a>
-            <a class="hub-nav-link" @click.prevent="changePage('dashboard')"><SettingOutlined />管理员</a>
-            <a class="hub-nav-link"><LogoutOutlined />退出</a>
-          </div>
+
+  <div v-else :class="['app', { collapsed: sidebarCollapsed }]">
+    <!-- ---------------------------------------------------------------- nav -->
+    <aside class="sidebar">
+      <div class="sidebar-head">
+        <span class="brand-mark">B</span>
+        <div class="brand-text">
+          <b>Bear MCP</b>
+          <small>管理控制台</small>
         </div>
+        <button class="btn btn-ghost btn-icon" style="margin-left: auto" title="折叠菜单" @click="toggleSidebar">
+          <Icon name="menu" />
+        </button>
+      </div>
+
+      <nav class="sidebar-nav">
+        <div class="nav-caption">治理</div>
+        <button
+          v-for="item in menu"
+          :key="item[0]"
+          :class="['nav-item', { active: page === item[0] }]"
+          @click="changePage(item[0])"
+        >
+          <Icon :name="item[2]" :size="15" />
+          <span class="nav-label">{{ item[1] }}</span>
+        </button>
+
+        <div class="nav-caption">创作空间</div>
+        <button
+          v-for="item in [['studioHome','首页','home'],['studioSkills','Skills','book'],['studioTools','Tools','zap'],['studioPrompts','Prompts','file'],['studioResources','Resources','layers'],['studioApis','API','globe']]"
+          :key="item[0]"
+          :class="['nav-item', { active: page === item[0] || page === item[0] + 'Edit' }]"
+          @click="changePage(item[0])"
+        >
+          <Icon :name="item[2]" :size="15" />
+          <span class="nav-label">{{ item[1] }}</span>
+        </button>
+
+        <div class="nav-caption">社区</div>
+        <button
+          v-for="item in [['shareHome','发现','sparkles'],['shareSkills','Skills','book'],['shareTools','Tools','zap'],['sharePrompts','Prompts','file'],['shareResources','Resources','layers'],['shareApis','API','globe'],['shareConfig','我的 MCP 配置','settings'],['shareTokens','Token 管理','key']]"
+          :key="item[0]"
+          :class="['nav-item', { active: page === item[0] }]"
+          @click="changePage(item[0])"
+        >
+          <Icon :name="item[2]" :size="15" />
+          <span class="nav-label">{{ item[1] }}</span>
+        </button>
       </nav>
 
-      <section class="hub-hero">
-        <h1>{{ title }}</h1>
-        <p>{{ desc }}</p>
-      </section>
+      <div class="sidebar-foot">
+        <div class="status-line"><span class="status-dot"></span><span>MCP Server Online</span></div>
+        <span>v0.1.0 · Admin Console</span>
+      </div>
+    </aside>
 
-      <main class="hub-main">
-        <template v-if="page === 'shareHome'">
-          <section class="community-market-shell">
-            <div class="community-search-row">
-              <div class="community-search">
-                <SearchOutlined />
-                <input v-model="communityKeyword" type="text" placeholder="搜索工具名、API Key、描述..." />
+    <div class="main">
+      <!-- ------------------------------------------------------------ topbar -->
+      <header class="topbar">
+        <div class="breadcrumb">
+          <span>{{ navSections[page] || 'MCP 管理后台' }}</span>
+          <span class="sep">/</span>
+          <span class="strong" style="color: hsl(var(--foreground))">{{ title }}</span>
+        </div>
+
+        <label class="topbar-search">
+          <Icon name="search" :size="14" />
+          <input v-model="navQuery" placeholder="搜索页面、工具或配置" />
+          <span class="kbd">⌘K</span>
+        </label>
+
+        <div class="topbar-actions">
+          <button class="btn btn-ghost btn-sm" @click="changePage('shareHome')">
+            <Icon name="sparkles" :size="14" /> 社区
+          </button>
+          <button class="btn btn-ghost btn-sm" @click="changePage('studioHome')">
+            <Icon name="rocket" :size="14" /> 创作空间
+          </button>
+          <button class="btn btn-ghost btn-icon" :title="theme === 'dark' ? '切换浅色' : '切换深色'" @click="toggleTheme">
+            <Icon :name="theme === 'dark' ? 'sun' : 'moon'" />
+          </button>
+          <div class="user-chip">
+            <span class="avatar">D</span>
+            <span>
+              <b>demo-admin</b>
+              <small>管理员</small>
+            </span>
+          </div>
+          <button class="btn btn-ghost btn-icon" title="退出登录" @click="showLogin">
+            <Icon name="logout" />
+          </button>
+        </div>
+      </header>
+
+      <div class="container">
+        <!-- --------------------------------------------------------- page head -->
+        <header class="page-head">
+          <div>
+            <div class="page-kicker">{{ navSections[page] || '控制台' }}</div>
+            <h1 class="page-title">{{ title }}</h1>
+            <p class="page-desc">{{ desc }}</p>
+          </div>
+          <div class="page-actions">
+            <button
+              v-if="['users','roles','tokens','requests','dataSources'].includes(page)"
+              class="btn btn-primary"
+              @click="openCreate"
+            >
+              <Icon name="plus" :size="15" />
+              新建{{ page === 'users' ? '用户' : page === 'roles' ? '角色' : page === 'tokens' ? 'Token' : page === 'requests' ? '请求配置' : '数据源' }}
+            </button>
+          </div>
+        </header>
+
+        <!-- --------------------------------------------------------- dashboard -->
+        <template v-if="page === 'dashboard'">
+          <div class="stat-grid">
+            <div
+              v-for="item in [['用户','users','users'],['角色','roles','shield'],['有效 Token','activeTokens','key'],['启用请求','enabledRequests','settings'],['动态工具','enabledDynamicTools','zap'],['今日调用','todayCalls','activity']]"
+              :key="item[1]"
+              class="stat"
+            >
+              <div class="stat-top">
+                <span class="stat-label">{{ item[0] }}</span>
+                <span class="stat-icon"><Icon :name="item[2]" :size="14" /></span>
               </div>
-              <button type="button" class="community-create-btn" @click="changePage('studioHome')"><PlusOutlined />创作能力</button>
+              <div class="stat-value">{{ dashboard[item[1]] || 0 }}</div>
+              <div class="stat-note"><span class="status-dot" style="width: 5px; height: 5px"></span> 数据库实时统计</div>
             </div>
+          </div>
 
-            <div class="community-overview">
-              <button type="button" class="community-stat-card" @click="changePage('shareSkills')">
-                <span><DatabaseOutlined /></span>
-                <b>{{ communitySkills.length }}</b>
-                <small>公开 Skills</small>
-              </button>
-              <button type="button" class="community-stat-card" @click="changePage('shareTools')">
-                <span><ThunderboltOutlined /></span>
-                <b>{{ communityTools.length + communityBuiltinTools.length }}</b>
-                <small>公开 MCP Tools</small>
-              </button>
-              <button type="button" class="community-stat-card" @click="changePage('sharePrompts')">
-                <span><AuditOutlined /></span>
-                <b>{{ communityPrompts.length }}</b>
-                <small>公开 MCP Prompts</small>
-              </button>
-              <button type="button" class="community-stat-card" @click="changePage('shareResources')">
-                <span><DatabaseOutlined /></span>
-                <b>{{ communityResources.length }}</b>
-                <small>公开 MCP Resources</small>
-              </button>
-              <button type="button" class="community-stat-card" @click="changePage('shareApis')">
-                <span><KeyOutlined /></span>
-                <b>{{ communityApis.length }}</b>
-                <small>公开 API 能力</small>
-              </button>
-              <div class="community-rule-card">
-                <b>公开负责发现，调用仍走权限</b>
-                <p>社区展示只说明能力存在，真正进入 tools/list / tools/call 还需要角色资格和 Token 工具选择。</p>
-              </div>
-            </div>
-
-            <div class="community-ranking-grid">
-              <section v-for="section in communityRankSections" :key="section.key" class="community-ranking-card">
-                <div class="community-ranking-head">
-                  <h2>{{ section.title }}</h2>
-                  <button type="button" @click="changePage(section.page)">全部</button>
-                </div>
-                <div v-if="section.items.length" class="community-ranking-list">
-                  <button v-for="(item, index) in section.items" :key="`${section.key}-${item.likeTargetKey}`" type="button" class="community-ranking-row" @click="section.open(item)">
-                    <span :class="['community-ranking-index', index < 3 ? 'top' : '']">{{ index + 1 }}</span>
-                    <span class="community-ranking-main">
-                      <b>{{ section.name(item) }}</b>
-                      <small>{{ section.code(item) }}</small>
-                    </span>
-                    <span class="community-ranking-like">{{ likeLabel(item) }}</span>
-                  </button>
-                </div>
-                <div v-else class="community-ranking-empty">暂无点赞</div>
-              </section>
-            </div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'shareSkills'">
-          <section class="community-market-shell">
-            <div class="community-search-row">
-              <div class="community-search">
-                <SearchOutlined />
-                <input v-model="communityKeyword" type="text" placeholder="搜索 Skill ID、名称、分类、文件名或描述..." />
-              </div>
-              <span class="community-count">共 {{ filteredCommunitySkills.length }} 个 Skill</span>
-            </div>
-
-            <div v-if="filteredCommunitySkills.length" class="community-card-grid">
-              <article v-for="item in rankedCommunitySkills" :key="item.id" class="community-card tool" @click="openCommunitySkillDetail(item)">
-                <div class="community-card-top">
-                  <div class="community-kind">
-                    <span class="community-card-icon"><DatabaseOutlined /></span>
-                    <b>Bear Skill</b>
-                  </div>
-                  <em>{{ item.skillCode || communityCode('SKILL', item.id) }}</em>
-                </div>
-                <h3>{{ item.name || '未命名 Skill' }}</h3>
-                <p>{{ item.description || '暂无描述' }}</p>
-                <div class="community-tags">
-                  <span>{{ item.category || '未分类' }}</span>
-                  <span>{{ item.fileName || 'SKILL.md' }}</span>
-                  <span>{{ item.fileSize ? `${Math.ceil(item.fileSize / 1024)} KB` : 'Markdown' }}</span>
-                </div>
-                <div class="community-card-foot community-skill-foot">
-                  <div class="community-card-meta">
-                    <span>管理员</span>
-                    <button type="button" :class="['community-like-btn', item.liked ? 'liked' : '']" @click.stop="toggleCommunityLike(item)">{{ likeLabel(item) }}</button>
-                  </div>
-                  <div class="community-skill-actions">
-                    <button type="button" class="primary" @click.stop="openCursorSkillInstall(item)">Cursor 安装</button>
-                    <button type="button" class="primary" @click.stop="copyCodexSkillInstall(item)">Codex 安装</button>
-                    <button type="button" @click.stop="downloadSkillZip(item)">下载 ZIP</button>
-                    <button type="button" @click.stop="openCommunitySkillDetail(item)">查看</button>
-                  </div>
-                </div>
-              </article>
-            </div>
-            <div v-else class="community-empty">没有匹配的公开 Skill。</div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'shareTools'">
-          <section class="community-market-shell">
-            <div class="community-search-row">
-              <div class="community-search">
-                <SearchOutlined />
-                <input v-model="communityKeyword" type="text" placeholder="搜索 Tool 名称、描述、API 白名单..." />
-              </div>
-              <span class="community-count">共 {{ filteredCommunityTools.length }} 个 Tool</span>
-            </div>
-            <div class="community-type-switch">
-              <button type="button" :class="{active: communityToolTypeFilter === 'all'}" @click="communityToolTypeFilter = 'all'">全部</button>
-              <button type="button" :class="{active: communityToolTypeFilter === 'dynamic'}" @click="communityToolTypeFilter = 'dynamic'">动态工具</button>
-              <button type="button" :class="{active: communityToolTypeFilter === 'builtin'}" @click="communityToolTypeFilter = 'builtin'">内置工具</button>
-            </div>
-
-            <div v-if="filteredCommunityTools.length" class="community-card-grid">
-              <article v-for="item in rankedCommunityTools" :key="`${item.communityType}-${item.id}`" class="community-card tool" @click="openCommunityToolDetail(item)">
-                <div class="community-card-top">
-                  <div class="community-kind">
-                    <span class="community-card-icon"><ThunderboltOutlined /></span>
-                    <b>{{ item.communityType === 'builtin' ? '内置工具' : '动态工具' }}</b>
-                  </div>
-                  <em>{{ communityToolCode(item) }}</em>
-                </div>
-                <h3>{{ item.displayName || '未命名 Tool' }}</h3>
-                <p>{{ item.displayDescription || '暂无描述' }}</p>
-                <div class="community-tags">
-                  <span>{{ communityToolCountLabel(item) }}</span>
-                  <span v-for="key in parseJsonArray(item.linkedRequestKeys).slice(0, 3)" :key="key">{{ key }}</span>
-                </div>
-                <div class="community-card-foot">
-                  <span>管理员</span>
-                  <button type="button" :class="['community-like-btn', item.liked ? 'liked' : '']" @click.stop="toggleCommunityLike(item)">{{ likeLabel(item) }}</button>
-                  <button type="button" @click.stop="openCommunityToolDetail(item)">查看</button>
-                </div>
-              </article>
-            </div>
-            <div v-else class="community-empty">没有匹配的公开 MCP Tool。</div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'sharePrompts'">
-          <section class="community-market-shell">
-            <div class="community-search-row">
-              <div class="community-search">
-                <SearchOutlined />
-                <input v-model="communityKeyword" type="text" placeholder="搜索 Prompt 名称、标题、描述、模板或工具..." />
-              </div>
-              <span class="community-count">共 {{ filteredCommunityPrompts.length }} 个 Prompt</span>
-            </div>
-
-            <div v-if="filteredCommunityPrompts.length" class="community-card-grid">
-              <article v-for="item in rankedCommunityPrompts" :key="item.id" class="community-card tool" @click="openCommunityPromptDetail(item)">
-                <div class="community-card-top">
-                  <div class="community-kind">
-                    <span class="community-card-icon"><AuditOutlined /></span>
-                    <b>MCP Prompt</b>
-                  </div>
-                  <em>{{ item.promptName || communityCode('PROMPT', item.id) }}</em>
-                </div>
-                <h3>{{ item.title || item.promptName || '未命名 Prompt' }}</h3>
-                <p>{{ item.description || compactText(item.templateContent, 96) || '暂无描述' }}</p>
-                <div class="community-tags">
-                  <span>{{ parseJsonArray(item.argumentsSchema).length }} 个参数</span>
-                  <span v-for="name in parseJsonArray(item.linkedToolNames).slice(0, 3)" :key="name">{{ name }}</span>
-                  <span v-if="!parseJsonArray(item.linkedToolNames).length">未绑定工具</span>
-                </div>
-                <div class="community-card-foot">
-                  <span>管理员</span>
-                  <button type="button" :class="['community-like-btn', item.liked ? 'liked' : '']" @click.stop="toggleCommunityLike(item)">{{ likeLabel(item) }}</button>
-                  <button type="button" @click.stop="openCommunityPromptDetail(item)">查看</button>
-                </div>
-              </article>
-            </div>
-            <div v-else class="community-empty">没有匹配的公开 MCP Prompt。</div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'shareResources'">
-          <section class="community-market-shell">
-            <div class="community-search-row">
-              <div class="community-search">
-                <SearchOutlined />
-                <input v-model="communityKeyword" type="text" placeholder="搜索 Resource URI、名称、文件名、MIME 或描述..." />
-              </div>
-              <span class="community-count">共 {{ filteredCommunityResources.length }} 个 Resource</span>
-            </div>
-
-            <div v-if="filteredCommunityResources.length" class="community-card-grid">
-              <article v-for="item in rankedCommunityResources" :key="item.id" class="community-card tool" @click="openCommunityResourceDetail(item)">
-                <div class="community-card-top">
-                  <div class="community-kind">
-                    <span class="community-card-icon"><DatabaseOutlined /></span>
-                    <b>MCP Resource</b>
-                  </div>
-                  <em>{{ item.resourceUri || communityCode('RES', item.id) }}</em>
-                </div>
-                <h3>{{ item.name || item.resourceUri || '未命名 Resource' }}</h3>
-                <p>{{ item.description || '暂无描述' }}</p>
-                <div class="community-tags">
-                  <span>{{ item.mimeType || 'text/markdown' }}</span>
-                  <span>{{ item.fileName || 'Markdown' }}</span>
-                  <span>{{ item.fileSize ? `${Math.ceil(item.fileSize / 1024)} KB` : '未记录大小' }}</span>
-                </div>
-                <div class="community-card-foot">
-                  <span>管理员</span>
-                  <button type="button" :class="['community-like-btn', item.liked ? 'liked' : '']" @click.stop="toggleCommunityLike(item)">{{ likeLabel(item) }}</button>
-                  <button type="button" @click.stop="openCommunityResourceDetail(item)">查看</button>
-                </div>
-              </article>
-            </div>
-            <div v-else class="community-empty">没有匹配的公开 MCP Resource。</div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'shareApis'">
-          <section class="community-market-shell">
-            <div class="community-search-row">
-              <div class="community-search">
-                <SearchOutlined />
-                <input v-model="communityKeyword" type="text" placeholder="搜索 API Key、名称、分类或描述..." />
-              </div>
-              <span class="community-count">共 {{ filteredCommunityApis.length }} 个 API</span>
-            </div>
-
-            <div v-if="filteredCommunityApis.length" class="community-card-grid api">
-              <article v-for="item in filteredCommunityApis" :key="item.id" class="community-card api" @click="openCommunityApiDetail(item)">
-                <div class="community-card-top">
-                  <div class="community-kind">
-                    <span class="community-card-icon"><KeyOutlined /></span>
-                    <b>API 能力</b>
-                  </div>
-                  <em>{{ communityCode('API', item.id) }}</em>
-                </div>
-                <h3>{{ item.configKey || item.name || '未命名 API' }}</h3>
-                <p>{{ item.description || item.name || '暂无描述' }}</p>
-                <div class="community-tags">
-                  <span>{{ item.type || 'HTTP' }}</span>
-                  <span>{{ item.method || 'GET' }}</span>
-                  <span>{{ item.category || '未分类' }}</span>
-                </div>
-                <div class="community-card-foot">
-                  <span>管理员</span>
-                  <span>基础能力</span>
-                  <button type="button" @click.stop="openCommunityApiDetail(item)">查看</button>
-                </div>
-              </article>
-            </div>
-            <div v-else class="community-empty">没有匹配的公开 API。</div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'shareConfig'">
-          <section class="community-market-shell share-config-shell">
-            <div class="community-search-row">
+          <section class="card">
+            <div class="card-head">
               <div>
-                <h2 class="community-page-title">选择 Token 并配置能力</h2>
-                <p class="community-page-desc">这些选择会决定该 Token 的 tools/list、prompts/list 和 resources/list 实际返回内容。</p>
+                <div class="card-title">最近调用</div>
+                <div class="card-desc">最新 100 条 MCP 能力调用记录</div>
               </div>
-              <div class="share-config-actions">
-                <button type="button" @click="saveShareMcpConfig">保存配置</button>
-                <button type="button" class="primary" @click="installShareConfigToCursor">一键配置到 Cursor</button>
-              </div>
-            </div>
-
-            <div v-if="rows.length" class="share-config-layout">
-              <aside class="share-config-token-panel">
-                <b>选择 Token</b>
-                <button
-                  v-for="token in rows"
-                  :key="token.id"
-                  type="button"
-                  :class="{active: activeConfigTokenId === token.id}"
-                  @click="activeConfigTokenId = token.id; applyConfigTokenSelections()"
-                >
-                  <span>{{ token.tokenName }}</span>
-                  <small>{{ token.tokenPrefix }}</small>
-                  <em>{{ Number(token.isActive) === 1 ? '启用' : '禁用' }}</em>
-                </button>
-                <button type="button" class="create-token-inline" @click="changePage('shareTokens')">管理 / 新建 Token</button>
-              </aside>
-
-              <div class="share-config-options">
-                <section class="tool-option-section">
-                  <div class="tool-option-title">
-                    <span class="tool-type-dot builtin"></span>
-                    MCP Tools
-                    <small>{{ selectedTokenTools.length }} 个已选择</small>
-                  </div>
-                  <div class="permission-bulk-actions"><a-button size="small" @click="selectAllTokenTools">全选</a-button><a-button size="small" @click="clearTokenTools">清空</a-button></div>
-                  <a-checkbox-group v-model:value="selectedTokenTools" class="tool-option-groups">
-                    <section class="tool-option-section compact-option-section"><div class="tool-option-title"><span class="tool-type-dot builtin"></span>内置工具 <small>系统注册</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectShareToolGroup('builtin')">全选</a-button><a-button size="small" @click="clearShareToolGroup('builtin')">取消</a-button></span></div><div class="tool-option-grid"><a-checkbox v-for="tool in builtinTools" :key="tool.name" :value="tool.name"><b>{{ tool.name }}</b><span>{{ tool.description }}</span></a-checkbox></div></section>
-                    <section class="tool-option-section compact-option-section"><div class="tool-option-title"><span class="tool-type-dot dynamic"></span>动态工具 <small>社区公开</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectShareToolGroup('dynamic')">全选</a-button><a-button size="small" @click="clearShareToolGroup('dynamic')">取消</a-button></span></div><div class="tool-option-grid"><a-checkbox v-for="tool in dynamicToolOptions" :key="tool.toolName" :value="tool.toolName"><b>{{ tool.toolName }}</b><span>{{ tool.toolDescription || '暂无描述' }}</span></a-checkbox></div></section>
-                    <section class="tool-option-section compact-option-section"><div class="tool-option-title"><span class="tool-type-dot remote"></span>飞书远程工具 <small>从飞书 MCP 实时发现</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectShareToolGroup('remote')">全选</a-button><a-button size="small" @click="clearShareToolGroup('remote')">取消</a-button></span></div><div class="tool-option-grid"><a-checkbox v-for="tool in feishuToolOptions" :key="tool.name" :value="tool.name"><b>{{ tool.name }}</b><span>{{ tool.description || '暂无描述' }}</span></a-checkbox></div><a-empty v-if="!feishuToolOptions.length" description="未发现飞书远程工具" :image-style="{height:'48px'}" /></section>
-                  </a-checkbox-group>
-                </section>
-
-                <section class="tool-option-section">
-                  <div class="tool-option-title">
-                    <span class="tool-type-dot dynamic"></span>
-                    MCP Prompts
-                    <small>{{ selectedTokenPrompts.length }} 个已选择</small>
-                  </div>
-                  <div class="permission-bulk-actions"><a-button size="small" @click="selectAllTokenPrompts">全选</a-button><a-button size="small" @click="clearTokenPrompts">清空</a-button></div>
-                  <a-checkbox-group v-model:value="selectedTokenPrompts" class="tool-option-grid">
-                    <a-checkbox v-for="prompt in promptOptions" :key="prompt.promptName" :value="prompt.promptName">
-                      <b>{{ prompt.title || prompt.promptName }}</b>
-                      <span>{{ prompt.promptName }}</span>
-                    </a-checkbox>
-                  </a-checkbox-group>
-                  <a-empty v-if="!promptOptions.length" description="暂无公开 Prompt" :image-style="{height:'48px'}" />
-                </section>
-
-                <section class="tool-option-section">
-                  <div class="tool-option-title">
-                    <span class="tool-type-dot dynamic"></span>
-                    MCP Resources
-                    <small>{{ selectedTokenResources.length }} 个已选择</small>
-                  </div>
-                  <div class="permission-bulk-actions"><a-button size="small" @click="selectAllTokenResources">全选</a-button><a-button size="small" @click="clearTokenResources">清空</a-button></div>
-                  <a-checkbox-group v-model:value="selectedTokenResources" class="tool-option-grid">
-                    <a-checkbox v-for="resource in resourceOptions" :key="resource.resourceUri" :value="resource.resourceUri">
-                      <b>{{ resource.name || resource.resourceUri }}</b>
-                      <span>{{ resource.resourceUri }}</span>
-                    </a-checkbox>
-                  </a-checkbox-group>
-                  <a-empty v-if="!resourceOptions.length" description="暂无公开 Resource" :image-style="{height:'48px'}" />
-                </section>
-              </div>
-            </div>
-            <div v-else class="community-empty">还没有 Token，请先去 Token 管理创建一把。</div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'shareTokens'">
-          <section class="community-market-shell">
-            <div class="community-search-row">
-              <div>
-                <h2 class="community-page-title">我的 MCP Token</h2>
-                <p class="community-page-desc">可以为 Cursor、Codex、测试环境分别创建不同 Token，彼此独立启用、禁用和过期。</p>
-              </div>
-              <button type="button" class="community-create-btn" @click="openCreate"><PlusOutlined />新建 Token</button>
-            </div>
-
-            <div v-if="rows.length" class="community-token-grid">
-              <article v-for="item in rows" :key="item.id" class="community-token-card">
-                <div class="community-token-top">
-                  <div>
-                    <b>{{ item.tokenName || '未命名 Token' }}</b>
-                    <small>{{ item.tokenPrefix || '只在创建时展示完整 Token' }}</small>
-                  </div>
-                  <span :class="['community-token-status', Number(item.isActive) === 1 ? 'active' : 'disabled']">
-                    {{ Number(item.isActive) === 1 ? '启用' : '禁用' }}
-                  </span>
-                </div>
-                <div class="community-token-meta">
-                  <span>{{ permissionLabel(item.permissions) }}</span>
-                  <span>过期：{{ item.expireTime || '永不过期' }}</span>
-                  <span>最后使用：{{ item.lastUsedTime || '尚未使用' }}</span>
-                </div>
-                <div class="community-token-actions">
-                  <button type="button" @click="edit(item)">编辑</button>
-                </div>
-              </article>
-            </div>
-            <div v-else class="community-empty">还没有 Token，先创建一把给 MCP Client 使用。</div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'studioHome'">
-          <section class="studio-workbench">
-            <div class="studio-command">
-              <span class="studio-kicker">Creator Hub</span>
-              <h2>把经验、接口和脚本沉淀成团队可复用的 AI 能力</h2>
-              <p>这里是能力作者的工作台：可以写 Skill、编排 Tool、沉淀 Prompt，也可以接入 API。完成后再发布到社区或进入 MCP 调用链路。</p>
-              <div class="studio-command-actions">
-                <button type="button" class="studio-primary-action"><PlusOutlined />开始创作</button>
-                <button type="button" class="studio-secondary-action" @click="changePage('shareHome')"><HomeOutlined />浏览社区</button>
-              </div>
-            </div>
-
-            <div class="studio-status-panel">
-              <div class="studio-panel-head">
-                <span>创作概览</span>
-              <b>Creator</b>
-              </div>
-              <div class="studio-panel-metrics">
-                <div><b>4</b><span>创作类型</span></div>
-                <div><b>{{ rows.length || 0 }}</b><span>已接 API</span></div>
-                <div><b>1</b><span>发布入口</span></div>
-              </div>
-              <div class="studio-path">
-                <span class="done">选择能力类型</span>
-                <span class="current">完善能力内容</span>
-                <span>发布到社区</span>
-              </div>
-            </div>
-          </section>
-
-          <section class="studio-lanes">
-            <a class="studio-lane skill" @click.prevent="changePage('studioSkills')">
-              <span class="studio-lane-icon"><DatabaseOutlined /></span>
-              <small>01</small>
-              <h3>Skills 创作</h3>
-              <p>把规范、步骤和上下文沉淀为 AI 可执行的工作说明。</p>
-            </a>
-            <a class="studio-lane tool" @click.prevent="changePage('studioTools')">
-              <span class="studio-lane-icon"><ThunderboltOutlined /></span>
-              <small>02</small>
-              <h3>Tools 创作</h3>
-              <p>把脚本逻辑和企业能力编排成可调用的 MCP 工具。</p>
-            </a>
-            <a class="studio-lane prompt" @click.prevent="changePage('studioPrompts')">
-              <span class="studio-lane-icon"><AuditOutlined /></span>
-              <small>03</small>
-              <h3>Prompts 创作</h3>
-              <p>维护结构化提示词模板，统一团队提问和输出格式。</p>
-            </a>
-            <a class="studio-lane skill" @click.prevent="changePage('studioResources')">
-              <span class="studio-lane-icon"><DatabaseOutlined /></span>
-              <small>04</small>
-              <h3>Resources 创作</h3>
-              <p>上传 Markdown 知识资源，让 Agent 按 URI 读取上下文。</p>
-            </a>
-            <a class="studio-lane api" @click.prevent="changePage('studioApis')">
-              <span class="studio-lane-icon"><KeyOutlined /></span>
-              <small>05</small>
-              <h3>API 创作</h3>
-              <p>接入外部 HTTP API，作为后续工具编排的基础能力。</p>
-            </a>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'studioSkills'">
-          <section class="api-library-shell tool-library-shell">
-            <div class="api-library-head">
-              <span class="api-section-kicker">Skill Workspace</span>
-              <h2>Skills 创作</h2>
-              <p>上传单文件 SKILL.md，发布后 Agent 可以通过 get_skill 获取并安装到 Cursor。</p>
-              <div class="api-library-search">
-                <SearchOutlined />
-                <input v-model="skillKeyword" type="text" placeholder="搜索 Skill ID、名称、描述、分类或文件名..." />
-              </div>
-            </div>
-
-            <div class="api-library-toolbar">
-              <div class="api-status-switch">
-                <button type="button" :class="{active: skillStatusFilter === 'all'}" @click="skillStatusFilter = 'all'">全部</button>
-                <button type="button" :class="{active: skillStatusFilter === 'online'}" @click="skillStatusFilter = 'online'">已上线</button>
-                <button type="button" :class="{active: skillStatusFilter === 'draft'}" @click="skillStatusFilter = 'draft'">草稿</button>
-              </div>
-              <div class="api-library-side">
-                <span>共 {{ filteredStudioSkills.length }} 个 Skill</span>
-                <button type="button" class="api-library-new" @click="openCreate"><PlusOutlined />新建</button>
-              </div>
-            </div>
-            <div class="api-visibility-note">
-              <span><i class="public"></i>公开：进入社区展示</span>
-              <span><i class="private"></i>不公开：可通过 get_skill 安装但不进入公开展示</span>
-            </div>
-
-            <div v-if="filteredStudioSkills.length" class="api-library-grid">
-              <article v-for="item in filteredStudioSkills" :key="item.id" class="api-library-card tool-library-card">
-                <div class="api-card-top">
-                  <span class="api-card-icon"><DatabaseOutlined /></span>
-                  <div class="api-card-badges">
-                    <span :class="['api-card-status', publishClass(item.publishStatus)]">{{ publishLabel(item.publishStatus) }}</span>
-                    <span v-if="Number(item.publishStatus) !== 0" :class="['api-card-visibility', visibilityClass(item.publishStatus)]">{{ visibilityLabel(item.publishStatus) }}</span>
-                  </div>
-                </div>
-                <div class="api-card-title-row">
-                  <h3>{{ item.name || '未命名 Skill' }}</h3>
-                  <code>{{ item.skillCode || '-' }}</code>
-                </div>
-                <p>{{ item.description || '还没有填写描述，建议说明这个 Skill 适合什么任务场景。' }}</p>
-                <div class="tool-card-meta">
-                  <span>Cursor Skill</span>
-                  <span>{{ item.category || '未分类' }}</span>
-                  <span>{{ item.fileSize ? `${Math.ceil(item.fileSize / 1024)} KB` : '未记录大小' }}</span>
-                </div>
-                <div class="tool-card-whitelist">
-                  <span>{{ item.fileName || '未上传文件' }}</span>
-                  <span>{{ item.skillCode || '保存时生成 Skill ID' }}</span>
-                </div>
-                <div class="api-card-foot">
-                  <span class="tool-script-preview">{{ compactText(item.description || item.fileName, 34) }}</span>
-                  <div class="tool-card-actions">
-                    <button type="button" @click="openSkillEditor(item)">编辑</button>
-                    <button type="button" :class="Number(item.publishStatus) === 0 ? 'publish' : 'danger'" @click="toggleOnlineSkill(item)">{{ onlineActionLabel(item.publishStatus) }}</button>
-                    <button type="button" class="private" :disabled="Number(item.publishStatus) === 0" @click="toggleVisibilitySkill(item)">{{ visibilityActionLabel(item.publishStatus) }}</button>
-                  </div>
-                </div>
-              </article>
-            </div>
-
-            <div v-else class="api-empty-panel">
-              <div class="api-empty-mark"><DatabaseOutlined /></div>
-              <h3>{{ rows.length ? '没有匹配的 Skill' : '还没有创建 Skill' }}</h3>
-              <p>{{ rows.length ? '换个关键词或筛选条件再看看。' : '先上传一个 SKILL.md，保存后通过 get_skill 分发给 Cursor Agent 安装。' }}</p>
-              <div class="api-empty-steps">
-                <span>上传 SKILL.md</span>
-                <span>发布上线</span>
-                <span>get_skill 安装</span>
-              </div>
-              <button v-if="!rows.length" type="button" @click="openCreate"><PlusOutlined />新建 Skill</button>
-            </div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'studioTools'">
-          <section class="api-library-shell tool-library-shell">
-            <div class="api-library-head">
-              <span class="api-section-kicker">Tool Workspace</span>
-              <h2>Tools 创作</h2>
-              <p>把已接入的 API 配置包装成 MCP Tool，让 AI Agent 能在 tools/list 中看到并通过 tools/call 调用。</p>
-              <div class="api-library-search">
-                <SearchOutlined />
-                <input v-model="toolKeyword" type="text" placeholder="搜索工具名、描述、API 白名单或脚本..." />
-              </div>
-            </div>
-
-            <div class="api-library-toolbar">
-              <div class="api-status-switch">
-                <button type="button" :class="{active: toolStatusFilter === 'all'}" @click="toolStatusFilter = 'all'">全部</button>
-                <button type="button" :class="{active: toolStatusFilter === 'online'}" @click="toolStatusFilter = 'online'">已上线</button>
-                <button type="button" :class="{active: toolStatusFilter === 'draft'}" @click="toolStatusFilter = 'draft'">草稿</button>
-              </div>
-              <div class="api-library-side">
-                <span>共 {{ filteredStudioTools.length }} 个 Tool</span>
-                <button type="button" class="api-library-new" @click="openCreate"><PlusOutlined />新建</button>
-              </div>
-            </div>
-            <div class="api-visibility-note">
-              <span><i class="public"></i>公开：进入社区</span>
-              <span><i class="private"></i>不公开：已上线但只在自己的创作空间可见</span>
-            </div>
-
-            <div v-if="filteredStudioTools.length" class="api-library-grid">
-              <article v-for="item in filteredStudioTools" :key="item.id" class="api-library-card tool-library-card">
-                <div class="api-card-top">
-                  <span class="api-card-icon"><ThunderboltOutlined /></span>
-                  <div class="api-card-badges">
-                    <span :class="['api-card-status', publishClass(item.publishStatus)]">{{ publishLabel(item.publishStatus) }}</span>
-                    <span v-if="Number(item.publishStatus) !== 0" :class="['api-card-visibility', visibilityClass(item.publishStatus)]">{{ visibilityLabel(item.publishStatus) }}</span>
-                  </div>
-                </div>
-                <div class="api-card-title-row">
-                  <h3>{{ item.toolName || '未命名 Tool' }}</h3>
-                </div>
-                <p>{{ item.toolDescription || '还没有填写工具描述，建议说明这个工具能帮 Agent 完成什么任务。' }}</p>
-                <div class="tool-card-meta">
-                  <span>MCP Tool</span>
-                  <span>{{ parseJsonArray(item.linkedRequestKeys).length }} 个 API</span>
-                  <span>{{ parseJsonArray(item.linkedDataSourceIds).length }} 个数据源</span>
-                </div>
-                <div class="tool-card-whitelist">
-                  <span v-for="key in parseJsonArray(item.linkedRequestKeys)" :key="key">{{ key }}</span>
-                  <span v-for="id in parseJsonArray(item.linkedDataSourceIds)" :key="`ds-${id}`">DS {{ id }}</span>
-                  <span v-if="!parseJsonArray(item.linkedRequestKeys).length">未绑定 API</span>
-                  <span v-if="!parseJsonArray(item.linkedDataSourceIds).length">未绑定数据源</span>
-                </div>
-                <div class="api-card-foot">
-                  <span class="tool-script-preview">{{ compactText(item.groovyScript, 34) }}</span>
-                  <div class="tool-card-actions">
-                    <button type="button" @click="openToolEditor(item)">编辑</button>
-                    <button type="button" :class="Number(item.publishStatus) === 0 ? 'publish' : 'danger'" @click="toggleOnlineTool(item)">{{ onlineActionLabel(item.publishStatus) }}</button>
-                    <button type="button" class="private" :disabled="Number(item.publishStatus) === 0" @click="toggleVisibilityTool(item)">{{ visibilityActionLabel(item.publishStatus) }}</button>
-                  </div>
-                </div>
-              </article>
-            </div>
-
-            <div v-else class="api-empty-panel">
-              <div class="api-empty-mark"><ThunderboltOutlined /></div>
-              <h3>{{ rows.length ? '没有匹配的 Tool' : '还没有创建 Tool' }}</h3>
-              <p>{{ rows.length ? '换个关键词或筛选条件再看看。' : '先选择已上线的 API 配置，再编写 Groovy 脚本，把它包装成 MCP Tool。' }}</p>
-              <div class="api-empty-steps">
-                <span>选择 API</span>
-                <span>编写脚本</span>
-                <span>调试发布</span>
-              </div>
-              <button v-if="!rows.length" type="button" @click="openCreate"><PlusOutlined />新建 Tool</button>
-            </div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'studioPrompts'">
-          <section class="api-library-shell tool-library-shell">
-            <div class="api-library-head">
-              <span class="api-section-kicker">Prompt Workspace</span>
-              <h2>Prompts 创作</h2>
-              <p>沉淀企业工作流模板，告诉 Agent 应该按什么流程、使用哪些工具、输出什么结构。</p>
-              <div class="api-library-search">
-                <SearchOutlined />
-                <input v-model="promptKeyword" type="text" placeholder="搜索 Prompt 名称、标题、描述、模板或工具..." />
-              </div>
-            </div>
-
-            <div class="api-library-toolbar">
-              <div class="api-status-switch">
-                <button type="button" :class="{active: promptStatusFilter === 'all'}" @click="promptStatusFilter = 'all'">全部</button>
-                <button type="button" :class="{active: promptStatusFilter === 'online'}" @click="promptStatusFilter = 'online'">已上线</button>
-                <button type="button" :class="{active: promptStatusFilter === 'draft'}" @click="promptStatusFilter = 'draft'">草稿</button>
-              </div>
-              <div class="api-library-side">
-                <span>共 {{ filteredStudioPrompts.length }} 个 Prompt</span>
-                <button type="button" class="api-library-new" @click="openCreate"><PlusOutlined />新建</button>
-              </div>
-            </div>
-            <div class="api-visibility-note">
-              <span><i class="public"></i>公开：进入社区</span>
-              <span><i class="private"></i>不公开：已上线但只在自己的创作空间可见</span>
-            </div>
-
-            <div v-if="filteredStudioPrompts.length" class="api-library-grid">
-              <article v-for="item in filteredStudioPrompts" :key="item.id" class="api-library-card tool-library-card">
-                <div class="api-card-top">
-                  <span class="api-card-icon"><AuditOutlined /></span>
-                  <div class="api-card-badges">
-                    <span :class="['api-card-status', publishClass(item.publishStatus)]">{{ publishLabel(item.publishStatus) }}</span>
-                    <span v-if="Number(item.publishStatus) !== 0" :class="['api-card-visibility', visibilityClass(item.publishStatus)]">{{ visibilityLabel(item.publishStatus) }}</span>
-                  </div>
-                </div>
-                <div class="api-card-title-row">
-                  <h3>{{ item.title || '未命名 Prompt' }}</h3>
-                  <code>{{ item.promptName || '-' }}</code>
-                </div>
-                <p>{{ item.description || '还没有填写描述，建议说明这个模板适合什么工作流。' }}</p>
-                <div class="tool-card-meta">
-                  <span>MCP Prompt</span>
-                  <span>{{ parseJsonArray(item.argumentsSchema).length }} 个参数</span>
-                  <span>{{ parseJsonArray(item.linkedToolNames).length }} 个建议工具</span>
-                </div>
-                <div class="tool-card-whitelist">
-                  <span v-for="name in parseJsonArray(item.linkedToolNames)" :key="name">{{ name }}</span>
-                  <span v-if="!parseJsonArray(item.linkedToolNames).length">未选择工具</span>
-                </div>
-                <div class="api-card-foot">
-                  <span class="tool-script-preview">{{ compactText(item.templateContent, 34) }}</span>
-                  <div class="tool-card-actions">
-                    <button type="button" @click="openPromptEditor(item)">编辑</button>
-                    <button type="button" :class="Number(item.publishStatus) === 0 ? 'publish' : 'danger'" @click="toggleOnlinePrompt(item)">{{ onlineActionLabel(item.publishStatus) }}</button>
-                    <button type="button" class="private" :disabled="Number(item.publishStatus) === 0" @click="toggleVisibilityPrompt(item)">{{ visibilityActionLabel(item.publishStatus) }}</button>
-                  </div>
-                </div>
-              </article>
-            </div>
-
-            <div v-else class="api-empty-panel">
-              <div class="api-empty-mark"><AuditOutlined /></div>
-              <h3>{{ rows.length ? '没有匹配的 Prompt' : '还没有创建 Prompt' }}</h3>
-              <p>{{ rows.length ? '换个关键词或筛选条件再看看。' : '先创建一个工作流模板，把工具使用顺序、参数要求和输出格式沉淀下来。' }}</p>
-              <div class="api-empty-steps">
-                <span>定义参数</span>
-                <span>选择工具</span>
-                <span>预览发布</span>
-              </div>
-              <button v-if="!rows.length" type="button" @click="openCreate"><PlusOutlined />新建 Prompt</button>
-            </div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'studioResources'">
-          <section class="api-library-shell tool-library-shell">
-            <div class="api-library-head">
-              <span class="api-section-kicker">Resource Workspace</span>
-              <h2>Resources 创作</h2>
-              <p>上传 Markdown 资源，发布后 Agent 可以通过 resources/list 发现，并用 resources/read 读取内容。</p>
-              <div class="api-library-search">
-                <SearchOutlined />
-                <input v-model="resourceKeyword" type="text" placeholder="搜索 Resource URI、名称、描述或文件名..." />
-              </div>
-            </div>
-
-            <div class="api-library-toolbar">
-              <div class="api-status-switch">
-                <button type="button" :class="{active: resourceStatusFilter === 'all'}" @click="resourceStatusFilter = 'all'">全部</button>
-                <button type="button" :class="{active: resourceStatusFilter === 'online'}" @click="resourceStatusFilter = 'online'">已上线</button>
-                <button type="button" :class="{active: resourceStatusFilter === 'draft'}" @click="resourceStatusFilter = 'draft'">草稿</button>
-              </div>
-              <div class="api-library-side">
-                <span>共 {{ filteredStudioResources.length }} 个 Resource</span>
-                <button type="button" class="api-library-new" @click="openCreate"><PlusOutlined />新建</button>
-              </div>
-            </div>
-            <div class="api-visibility-note">
-              <span><i class="public"></i>公开：进入社区</span>
-              <span><i class="private"></i>不公开：已上线但只在权限链路中可选</span>
-            </div>
-
-            <div v-if="filteredStudioResources.length" class="api-library-grid">
-              <article v-for="item in filteredStudioResources" :key="item.id" class="api-library-card tool-library-card">
-                <div class="api-card-top">
-                  <span class="api-card-icon"><DatabaseOutlined /></span>
-                  <div class="api-card-badges">
-                    <span :class="['api-card-status', publishClass(item.publishStatus)]">{{ publishLabel(item.publishStatus) }}</span>
-                    <span v-if="Number(item.publishStatus) !== 0" :class="['api-card-visibility', visibilityClass(item.publishStatus)]">{{ visibilityLabel(item.publishStatus) }}</span>
-                  </div>
-                </div>
-                <div class="api-card-title-row">
-                  <h3>{{ item.name || '未命名 Resource' }}</h3>
-                  <code>{{ item.resourceUri || '-' }}</code>
-                </div>
-                <p>{{ item.description || '还没有填写描述，建议说明这份 Markdown 资源适合什么场景读取。' }}</p>
-                <div class="tool-card-meta">
-                  <span>MCP Resource</span>
-                  <span>{{ item.mimeType || 'text/markdown' }}</span>
-                  <span>{{ item.fileSize ? `${Math.ceil(item.fileSize / 1024)} KB` : '未记录大小' }}</span>
-                </div>
-                <div class="tool-card-whitelist">
-                  <span>{{ item.fileName || '未上传文件' }}</span>
-                  <span>{{ item.resourceUri || '未配置 URI' }}</span>
-                </div>
-                <div class="api-card-foot">
-                  <span class="tool-script-preview">{{ compactText(item.description || item.fileName, 34) }}</span>
-                  <div class="tool-card-actions">
-                    <button type="button" @click="openResourceEditor(item)">编辑</button>
-                    <button type="button" :class="Number(item.publishStatus) === 0 ? 'publish' : 'danger'" @click="toggleOnlineResource(item)">{{ onlineActionLabel(item.publishStatus) }}</button>
-                    <button type="button" class="private" :disabled="Number(item.publishStatus) === 0" @click="toggleVisibilityResource(item)">{{ visibilityActionLabel(item.publishStatus) }}</button>
-                  </div>
-                </div>
-              </article>
-            </div>
-
-            <div v-else class="api-empty-panel">
-              <div class="api-empty-mark"><DatabaseOutlined /></div>
-              <h3>{{ rows.length ? '没有匹配的 Resource' : '还没有创建 Resource' }}</h3>
-              <p>{{ rows.length ? '换个关键词或筛选条件再看看。' : '先上传一份 Markdown 文件，保存为 MCP Resource，再配置角色和 Token 可见范围。' }}</p>
-              <div class="api-empty-steps">
-                <span>填写 URI</span>
-                <span>上传 Markdown</span>
-                <span>授权读取</span>
-              </div>
-              <button v-if="!rows.length" type="button" @click="openCreate"><PlusOutlined />新建 Resource</button>
-            </div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'studioApis'">
-          <section class="api-library-shell">
-            <div class="api-library-head">
-              <span class="api-section-kicker">API Workspace</span>
-              <h2>API 创作</h2>
-              <p>创建外部 HTTP API 配置，供后续动态工具 runRequest 调用。</p>
-              <div class="api-library-search">
-                <SearchOutlined />
-                <input v-model="apiKeyword" type="text" placeholder="搜索接口 ID、配置键、名称或 URL..." />
-              </div>
-            </div>
-
-            <div class="api-library-toolbar">
-              <div class="api-status-switch">
-                <button type="button" :class="{active: apiStatusFilter === 'all'}" @click="apiStatusFilter = 'all'">全部</button>
-                <button type="button" :class="{active: apiStatusFilter === 'online'}" @click="apiStatusFilter = 'online'">已上线</button>
-                <button type="button" :class="{active: apiStatusFilter === 'draft'}" @click="apiStatusFilter = 'draft'">草稿</button>
-              </div>
-              <div class="api-library-side">
-                <span>共 {{ filteredStudioApis.length }} 个 API</span>
-                <button type="button" class="api-library-new" @click="openCreate"><PlusOutlined />新建</button>
-              </div>
-            </div>
-            <div class="api-visibility-note">
-              <span><i class="public"></i>公开：进入社区</span>
-              <span><i class="private"></i>不公开：只在自己的创作空间可见</span>
-            </div>
-
-            <div v-if="filteredStudioApis.length" class="api-library-grid">
-              <article v-for="item in filteredStudioApis" :key="item.id" class="api-library-card">
-                <div class="api-card-top">
-                  <span class="api-card-icon"><KeyOutlined /></span>
-                  <div class="api-card-badges">
-                    <span :class="['api-card-status', publishClass(item.publishStatus)]">{{ publishLabel(item.publishStatus) }}</span>
-                    <span v-if="Number(item.publishStatus) !== 0" :class="['api-card-visibility', visibilityClass(item.publishStatus)]">{{ visibilityLabel(item.publishStatus) }}</span>
-                  </div>
-                </div>
-                <div class="api-card-title-row">
-                  <h3>{{ item.configKey || item.name || '未命名 API' }}</h3>
-                  <code>{{ item.requestId || '-' }}</code>
-                </div>
-                <p>{{ item.description || item.name || '还没有填写描述，建议说明这个接口适合被哪个动态工具调用。' }}</p>
-                <div class="api-card-route">
-                  <span>{{ item.type || 'HTTP' }}</span>
-                  <b>{{ item.method || 'GET' }}</b>
-                  <code>{{ item.url || '尚未配置请求 URL' }}</code>
-                </div>
-                <div class="api-card-foot">
-                  <span>{{ item.category || '未分类' }}</span>
-                  <div>
-                    <button type="button" @click="openApiDebug(item)">调试</button>
-                    <button type="button" @click="openApiEditor(item)">编辑</button>
-                    <button type="button" :class="Number(item.publishStatus) === 0 ? 'publish' : 'danger'" @click="toggleOnlineApi(item)">{{ onlineActionLabel(item.publishStatus) }}</button>
-                    <button type="button" class="private" :disabled="Number(item.publishStatus) === 0" @click="toggleVisibilityApi(item)">{{ visibilityActionLabel(item.publishStatus) }}</button>
-                  </div>
-                </div>
-              </article>
-            </div>
-
-            <div v-else class="api-empty-panel">
-              <div class="api-empty-mark"><KeyOutlined /></div>
-              <h3>{{ rows.length ? '没有匹配的 API' : '还没有接入 API' }}</h3>
-              <p>{{ rows.length ? '换个关键词或筛选条件再看看。' : '先创建一个 HTTP API，保存真实接口配置，再用发送调试验证响应。' }}</p>
-              <div class="api-empty-steps">
-                <span>配置接口</span>
-                <span>发送调试</span>
-                <span>发布能力</span>
-              </div>
-              <button v-if="!rows.length" type="button" @click="openCreate"><PlusOutlined />新建 HTTP API</button>
-            </div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'studioPromptEdit'">
-          <section class="tool-editor-shell">
-            <div class="api-editor-header">
-              <div>
-                <button type="button" class="api-back-btn" @click="changePage('studioPrompts')">← 返回列表</button>
-                <span class="api-section-kicker">MCP Prompt</span>
-                <h2>{{ model.id ? '编辑 Prompt' : '新建 Prompt' }}</h2>
-                <p>Prompt 模板负责沉淀工作流：写清楚 Agent 应该使用哪些工具、按什么顺序执行，以及最终如何组织答案。</p>
-              </div>
-              <aside>
-                <span>当前模板</span>
-                <b>{{ model.promptName || '未命名 Prompt' }}</b>
-                <small>{{ Number(model.publishStatus) === 0 ? '草稿状态，可先预览再上线' : `${publishLabel(model.publishStatus)}，${visibilityLabel(model.publishStatus)}` }}</small>
-              </aside>
-            </div>
-
-            <div class="tool-editor-board">
-              <aside class="tool-editor-meta">
-                <div class="tool-editor-panel-head">
-                  <b>基本信息</b>
-                  <span>Prompt 名称会出现在 prompts/list</span>
-                </div>
-                <label>
-                  <span>Prompt 名称</span>
-                  <input v-model="model.promptName" placeholder="如 analyze_user_growth" />
-                </label>
-                <label>
-                  <span>标题</span>
-                  <input v-model="model.title" placeholder="如 用户增长分析流程" />
-                </label>
-                <label>
-                  <span>描述</span>
-                  <textarea v-model="model.description" spellcheck="false" placeholder="说明这个模板适合什么任务"></textarea>
-                </label>
-
-                <div class="tool-editor-panel-head compact">
-                  <b>参数</b>
-                  <button type="button" @click="addPromptArgument"><PlusOutlined />新增</button>
-                </div>
-                <p class="tool-api-empty">模板里的 <code v-pre>{{topic}}</code> 对应参数名 topic，可从模板自动提取。</p>
-                <div v-if="promptArguments().length" class="prompt-param-list">
-                  <div v-for="(arg, index) in promptArguments()" :key="arg._key" class="prompt-param-item">
-                    <input :value="arg.name" placeholder="参数名" @input="updatePromptArgument(index, 'name', $event.target.value)" />
-                    <input :value="arg.description" placeholder="描述" @input="updatePromptArgument(index, 'description', $event.target.value)" />
-                    <input :value="arg.defaultValue" placeholder="默认值" @input="updatePromptArgument(index, 'defaultValue', $event.target.value)" />
-                    <label class="prompt-param-check">
-                      <input type="checkbox" :checked="Boolean(arg.required)" @change="updatePromptArgument(index, 'required', $event.target.checked)" />
-                      <span>必填</span>
-                    </label>
-                    <button type="button" @click="removePromptArgument(index)">删除</button>
-                  </div>
-                </div>
-                <p v-else class="tool-api-empty">暂无参数，可以手动新增，或从模板内容自动提取。</p>
-
-                <div class="tool-editor-panel-head compact">
-                  <b>建议工具</b>
-                  <span>已选 {{ selectedPromptToolNames.length }} 个</span>
-                </div>
-                <a-select
-                  v-model:value="selectedPromptToolNames"
-                  mode="multiple"
-                  show-search
-                  allow-clear
-                  :options="promptToolOptions"
-                  option-filter-prop="label"
-                  placeholder="选择这个流程建议使用的 Tool"
-                  class="tool-api-select"
-                  popupClassName="dark-select-dropdown tool-api-dropdown"
-                  max-tag-count="responsive"
-                />
-              </aside>
-
-              <section class="tool-script-editor">
-                <div class="tool-editor-panel-head">
-                  <b>模板内容</b>
-                  <span class="tool-head-actions">
-                    <button type="button" @click="extractPromptArgumentsFromTemplate">提取参数</button>
-                    <button type="button" @click="insertPromptToolsPlaceholder">插入工具清单</button>
-                  </span>
-                </div>
-                <textarea v-model="model.templateContent" spellcheck="false"></textarea>
-                <div class="tool-editor-actions">
-                  <button type="button" class="tool-save-btn" :disabled="promptSaving" @click="savePromptEditor">{{ promptSaving ? '保存中' : '保存 Prompt' }}</button>
-                  <button type="button" class="tool-run-btn" :disabled="promptPreviewLoading" @click="previewPromptEditor">{{ promptPreviewLoading ? '预览中' : '预览渲染' }}</button>
-                  <button v-if="model.id" type="button" class="tool-online-btn" @click="toggleOnlinePrompt(model)">
-                    {{ onlineActionLabel(model.publishStatus) }}
-                  </button>
-                  <button v-if="model.id" type="button" class="tool-online-btn" :disabled="Number(model.publishStatus) === 0" @click="toggleVisibilityPrompt(model)">
-                    {{ visibilityActionLabel(model.publishStatus) }}
-                  </button>
-                </div>
-              </section>
-
-              <aside class="tool-debug-panel">
-                <div class="tool-editor-panel-head">
-                  <b>预览参数</b>
-                  <button type="button" @click="promptPreviewArgs = buildPromptPreviewArgs()">重置</button>
-                </div>
-                <textarea v-model="promptPreviewArgs" spellcheck="false"></textarea>
-                <div class="tool-editor-panel-head compact">
-                  <b>渲染结果</b>
-                  <span>{{ promptPreviewResult?.success === false ? '失败' : 'Preview' }}</span>
-                </div>
-                <pre>{{ promptPreviewResult?.renderedContent || promptPreviewResult?.errorMessage || '点击「预览渲染」后显示 prompts/get 最终返回的文本' }}</pre>
-              </aside>
-            </div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'studioSkillEdit'">
-          <section class="tool-editor-shell">
-            <div class="api-editor-header">
-              <div>
-                <button type="button" class="api-back-btn" @click="changePage('studioSkills')">← 返回列表</button>
-                <span class="api-section-kicker">Cursor Skill</span>
-                <h2>{{ model.id ? '编辑 Skill' : '新建 Skill' }}</h2>
-                <p>Skill 是可安装的任务说明包。当前先支持单文件 SKILL.md，Agent 通过 get_skill 获取后写入 Cursor Skills 目录。</p>
-              </div>
-              <aside>
-                <span>当前 Skill</span>
-                <b>{{ model.skillCode || '保存时生成 Skill ID' }}</b>
-                <small>{{ Number(model.publishStatus) === 0 ? '草稿状态，发布后 get_skill 才能读取' : `${publishLabel(model.publishStatus)}，${visibilityLabel(model.publishStatus)}` }}</small>
-              </aside>
-            </div>
-
-            <div class="tool-editor-board resource-editor-board">
-              <aside class="tool-editor-meta">
-                <div class="tool-editor-panel-head">
-                  <b>基本信息</b>
-                  <span>Skill ID 用于 get_skill 安装</span>
-                </div>
-                <label>
-                  <span>Skill ID</span>
-                  <input v-model="model.skillCode" placeholder="保存时自动生成" readonly />
-                </label>
-                <label>
-                  <span>名称</span>
-                  <input v-model="model.name" placeholder="如 作业合规检查" />
-                </label>
-                <label>
-                  <span>描述</span>
-                  <textarea v-model="model.description" spellcheck="false" placeholder="说明这个 Skill 适合什么任务场景"></textarea>
-                </label>
-                <label>
-                  <span>分类</span>
-                  <input v-model="model.category" placeholder="如 教学教务 / 研发提效" />
-                </label>
-
-                <div class="tool-editor-panel-head compact">
-                  <b>SKILL.md 文件</b>
-                  <span>{{ model.fileName || '未上传' }}</span>
-                </div>
-                <label class="resource-upload-box">
-                  <input type="file" accept=".md,text/markdown" @change="onSkillFileChange" />
-                  <span><DatabaseOutlined />选择 SKILL.md</span>
-                  <small>{{ skillSelectedFile?.name || model.fileName || '仅支持 .md，建议小于 2MB' }}</small>
-                </label>
-              </aside>
-
-              <section class="tool-script-editor">
-                <div class="tool-editor-panel-head">
-                  <b>Skill 预览</b>
-                  <span>{{ skillPreviewLoading ? '读取中' : '安装时会自动补齐 frontmatter' }}</span>
-                </div>
-                <div class="resource-storage-panel">
-                  <div>
-                    <span>安装目录</span>
-                    <b>{{ model.name || model.skillCode || '-' }}</b>
-                  </div>
-                  <div>
-                    <span>文件大小</span>
-                    <b>{{ model.fileSize ? `${Math.ceil(model.fileSize / 1024)} KB` : '-' }}</b>
-                  </div>
-                  <div>
-                    <span>存储状态</span>
-                    <code>{{ model.objectKey ? '已上传到对象存储' : '保存时自动上传到对象存储' }}</code>
-                  </div>
-                </div>
-                <div class="resource-markdown-preview" v-html="skillPreviewHtml"></div>
-                <div class="tool-editor-actions">
-                  <button type="button" class="tool-save-btn" :disabled="skillSaving" @click="saveSkillEditor">{{ skillSaving ? '保存中' : '保存 Skill' }}</button>
-                  <button v-if="model.id" type="button" class="tool-run-btn" :disabled="skillPreviewLoading" @click="loadSkillPreview()">
-                    {{ skillPreviewLoading ? '读取中' : '刷新预览' }}
-                  </button>
-                  <button v-if="model.id" type="button" class="tool-online-btn" @click="toggleOnlineSkill(model)">
-                    {{ onlineActionLabel(model.publishStatus) }}
-                  </button>
-                  <button v-if="model.id" type="button" class="tool-online-btn" :disabled="Number(model.publishStatus) === 0" @click="toggleVisibilitySkill(model)">
-                    {{ visibilityActionLabel(model.publishStatus) }}
-                  </button>
-                </div>
-              </section>
-            </div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'studioResourceEdit'">
-          <section class="tool-editor-shell">
-            <div class="api-editor-header">
-              <div>
-                <button type="button" class="api-back-btn" @click="changePage('studioResources')">← 返回列表</button>
-                <span class="api-section-kicker">MCP Resource</span>
-                <h2>{{ model.id ? '编辑 Resource' : '新建 Resource' }}</h2>
-                <p>Resource 负责保存可读取的企业上下文。当前先支持 Markdown 文件，内容由 Agent 通过 resources/read 获取。</p>
-              </div>
-              <aside>
-                <span>当前资源</span>
-                <b>{{ model.resourceUri || '未命名 Resource' }}</b>
-                <small>{{ Number(model.publishStatus) === 0 ? '草稿状态，发布后才能进入权限链路' : `${publishLabel(model.publishStatus)}，${visibilityLabel(model.publishStatus)}` }}</small>
-              </aside>
-            </div>
-
-            <div class="tool-editor-board resource-editor-board">
-              <aside class="tool-editor-meta">
-                <div class="tool-editor-panel-head">
-                  <b>基本信息</b>
-                  <span>Resource URI 会出现在 resources/list</span>
-                </div>
-                <label>
-                  <span>Resource URI</span>
-                  <input v-model="model.resourceUri" placeholder="如 bear://docs/homework_rules" />
-                </label>
-                <label>
-                  <span>名称</span>
-                  <input v-model="model.name" placeholder="如 作业提交规则" />
-                </label>
-                <label>
-                  <span>描述</span>
-                  <textarea v-model="model.description" spellcheck="false" placeholder="说明这份资源适合什么场景读取"></textarea>
-                </label>
-
-                <div class="tool-editor-panel-head compact">
-                  <b>Markdown 文件</b>
-                  <span>{{ model.fileName || '未上传' }}</span>
-                </div>
-                <label class="resource-upload-box">
-                  <input type="file" accept=".md,text/markdown" @change="onResourceFileChange" />
-                  <span><DatabaseOutlined />选择 Markdown 文件</span>
-                  <small>{{ resourceSelectedFile?.name || model.fileName || '仅支持 .md，建议小于 2MB' }}</small>
-                </label>
-              </aside>
-
-              <section class="tool-script-editor">
-                <div class="tool-editor-panel-head">
-                  <b>文档预览</b>
-                  <span>{{ resourcePreviewLoading ? '读取中' : '通过预签名地址读取 Markdown 内容' }}</span>
-                </div>
-                <div class="resource-storage-panel">
-                  <div>
-                    <span>MIME 类型</span>
-                    <b>{{ model.mimeType || 'text/markdown' }}</b>
-                  </div>
-                  <div>
-                    <span>文件大小</span>
-                    <b>{{ model.fileSize ? `${Math.ceil(model.fileSize / 1024)} KB` : '-' }}</b>
-                  </div>
-                  <div>
-                    <span>存储状态</span>
-                    <code>{{ model.objectKey ? '已上传到对象存储' : '保存时自动上传到对象存储' }}</code>
-                  </div>
-                </div>
-                <div class="resource-markdown-preview" v-html="resourcePreviewHtml"></div>
-                <div class="tool-editor-actions">
-                  <button type="button" class="tool-save-btn" :disabled="resourceSaving" @click="saveResourceEditor">{{ resourceSaving ? '保存中' : '保存 Resource' }}</button>
-                  <button v-if="model.id" type="button" class="tool-run-btn" :disabled="resourcePreviewLoading" @click="loadResourcePreview()">
-                    {{ resourcePreviewLoading ? '读取中' : '刷新预览' }}
-                  </button>
-                  <button v-if="model.id" type="button" class="tool-online-btn" @click="toggleOnlineResource(model)">
-                    {{ onlineActionLabel(model.publishStatus) }}
-                  </button>
-                  <button v-if="model.id" type="button" class="tool-online-btn" :disabled="Number(model.publishStatus) === 0" @click="toggleVisibilityResource(model)">
-                    {{ visibilityActionLabel(model.publishStatus) }}
-                  </button>
-                </div>
-              </section>
-            </div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'studioToolEdit'">
-          <section class="tool-editor-shell">
-            <div class="api-editor-header">
-              <div>
-                <button type="button" class="api-back-btn" @click="changePage('studioTools')">← 返回列表</button>
-                <span class="api-section-kicker">Dynamic Tool</span>
-                <h2>{{ model.id ? '编辑 Tool' : '新建 Tool' }}</h2>
-                <p>Tool 创作负责包装能力：通过 inputSchema 定义入参，通过 Groovy 编排逻辑，并用 <code>runRequest.runRequest</code> 或 <code>runSql.runSql</code> 调用已保存的能力配置。</p>
-              </div>
-              <aside>
-                <span>当前工具</span>
-                <b>{{ model.toolName || '未命名 Tool' }}</b>
-                <small>{{ Number(model.publishStatus) === 0 ? '草稿状态，可先调试再上线' : `${publishLabel(model.publishStatus)}，${visibilityLabel(model.publishStatus)}` }}</small>
-              </aside>
-            </div>
-
-            <div class="tool-editor-board">
-              <aside class="tool-editor-meta">
-                <div class="tool-editor-panel-head">
-                  <b>Tool 基本信息</b>
-                  <span>Agent 会根据名称、描述和 Schema 选择工具</span>
-                </div>
-                <label>
-                  <span>工具名</span>
-                  <input v-model="model.toolName" placeholder="如 query_course_list_tool" />
-                </label>
-                <label>
-                  <span>工具描述</span>
-                  <textarea v-model="model.toolDescription" spellcheck="false" placeholder="说明这个工具适合解决什么问题"></textarea>
-                </label>
-                <label>
-                  <span>inputSchema</span>
-                  <textarea v-model="model.inputSchema" class="tool-code-input" spellcheck="false"></textarea>
-                </label>
-                <div class="tool-editor-panel-head compact">
-                  <b>API 白名单</b>
-                  <span>已选 {{ selectedToolRequestKeys.length }} 个 configKey</span>
-                </div>
-                <a-select
-                  v-model:value="selectedToolRequestKeys"
-                  mode="multiple"
-                  show-search
-                  allow-clear
-                  :options="toolApiOptions"
-                  option-filter-prop="label"
-                  placeholder="搜索并选择可调用的 API configKey"
-                  class="tool-api-select"
-                  popupClassName="dark-select-dropdown tool-api-dropdown"
-                  max-tag-count="responsive"
-                />
-                <p v-if="!availableToolApis.length" class="tool-api-empty">暂无已上线 API，请先在 API 创作中上线一个配置。</p>
-                <div class="tool-editor-panel-head compact">
-                  <b>数据源白名单</b>
-                  <span>已选 {{ selectedToolDataSourceIds.length }} 个 datasourceId</span>
-                </div>
-                <a-select
-                  v-model:value="selectedToolDataSourceIds"
-                  mode="multiple"
-                  show-search
-                  allow-clear
-                  :options="toolDataSourceOptions"
-                  option-filter-prop="label"
-                  placeholder="搜索并选择可查询的数据源"
-                  class="tool-api-select"
-                  popupClassName="dark-select-dropdown tool-api-dropdown"
-                  max-tag-count="responsive"
-                />
-                <p v-if="!availableToolDataSources.length" class="tool-api-empty">暂无已发布数据源，请先在管理后台发布一个数据源。</p>
-              </aside>
-
-              <section class="tool-script-editor">
-                <div class="tool-editor-panel-head">
-                  <b>Groovy 脚本</b>
-                  <span class="tool-head-actions">
-                    <button type="button" @click="generateToolSchemaFromScript">从脚本生成 Schema</button>
-                    <button type="button" @click="generateToolAssetsFromDataSourceSelection">按已选数据源生成</button>
-                    <button type="button" @click="generateToolAssetsFromSelection">按已选 API 生成</button>
-                  </span>
-                </div>
-                <textarea v-model="model.groovyScript" spellcheck="false"></textarea>
-                <div class="tool-editor-actions">
-                  <button type="button" class="tool-save-btn" :disabled="toolSaving" @click="saveToolEditor">{{ toolSaving ? '保存中' : '保存 Tool' }}</button>
-                  <button type="button" class="tool-run-btn" :disabled="toolDebugLoading" @click="sendToolEditor">{{ toolDebugLoading ? '运行中' : '运行调试' }}</button>
-                  <button v-if="model.id" type="button" class="tool-online-btn" @click="toggleOnlineTool(model)">
-                    {{ onlineActionLabel(model.publishStatus) }}
-                  </button>
-                  <button v-if="model.id" type="button" class="tool-online-btn" :disabled="Number(model.publishStatus) === 0" @click="toggleVisibilityTool(model)">
-                    {{ visibilityActionLabel(model.publishStatus) }}
-                  </button>
-                </div>
-              </section>
-
-              <aside class="tool-debug-panel">
-                <div class="tool-editor-panel-head">
-                  <b>调试面板</b>
-                  <span>输入 params，查看脚本返回值或错误信息</span>
-                </div>
-                <label>
-                  <span>测试参数 JSON</span>
-                  <textarea v-model="toolDebugParams" spellcheck="false"></textarea>
-                </label>
-                <div class="tool-debug-result-head">
-                  <b>执行结果</b>
-                  <span v-if="toolDebugResult" :class="toolDebugResult.success ? 'success' : 'error'">{{ toolDebugResult.success ? '成功' : '失败' }} · {{ toolDebugResult.durationMs ?? '-' }} ms</span>
-                  <span v-else>等待调试</span>
-                </div>
-                <pre>{{ toolDebugText }}</pre>
-              </aside>
-            </div>
-          </section>
-        </template>
-
-        <template v-else-if="page === 'studioApiEdit'">
-          <section class="api-editor-shell">
-            <div class="api-editor-header">
-              <div>
-                <button type="button" class="api-back-btn" @click="changePage('studioApis')">← 返回列表</button>
-                <span class="api-section-kicker">HTTP Request</span>
-                <h2>{{ model.id ? '编辑 API' : '新建 API' }}</h2>
-                <p>配置外部 HTTP API，使用 <code v-text="'{{key}}'"></code> 占位符完成参数替换，保存后可直接发送调试。</p>
-              </div>
-              <aside>
-                <span>当前配置</span>
-                <b>{{ model.configKey || '未命名配置' }}</b>
-                <small>{{ model.url || '等待填写请求地址' }}</small>
-              </aside>
-            </div>
-
-            <div class="api-editor-board">
-              <div class="api-editor-meta">
-                <label>
-                  <span>协议类型</span>
-                  <select v-model="model.type">
-                    <option value="HTTP">HTTP</option>
-                  </select>
-                </label>
-                <label>
-                  <span>配置键</span>
-                  <input v-model="model.configKey" placeholder="如 ylog_search，用于 runRequest 调用" />
-                </label>
-                <label>
-                  <span>接口名称</span>
-                  <input v-model="model.name" placeholder="接口名称" />
-                </label>
-              </div>
-
-              <div class="api-request-line">
-                <select v-model="model.method">
-                  <option value="GET">GET</option>
-                  <option value="POST">POST</option>
-                  <option value="PUT">PUT</option>
-                  <option value="DELETE">DELETE</option>
-                </select>
-                <input v-model="model.url" :placeholder="'输入请求 URL，支持 {{key}} 占位符'" />
-                <button type="button" class="api-send-btn" :disabled="debugLoading" @click="sendApiEditor">发送</button>
-                <button type="button" class="api-save-btn" :disabled="apiSaving" @click="saveApiEditor">
-                  {{ apiSaving ? '保存中' : '保存' }}
+              <div class="card-tools">
+                <button class="btn btn-outline btn-sm" :disabled="loading" @click="load">
+                  <Icon name="refresh" :size="13" /> 刷新
                 </button>
               </div>
+            </div>
+            <div class="table-wrap">
+              <table class="dt">
+                <thead>
+                  <tr>
+                    <th>时间</th>
+                    <th>类型</th>
+                    <th>名称 / 标识</th>
+                    <th>动作</th>
+                    <th>用户</th>
+                    <th>状态</th>
+                    <th style="text-align: right">耗时(ms)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in rows" :key="row.id">
+                    <td class="cell-mono">{{ row.createTime }}</td>
+                    <td><span class="badge badge-outline">{{ capabilityTypeLabel(row.capabilityType) }}</span></td>
+                    <td><span class="cell-truncate" :title="row.capabilityName">{{ compactText(row.capabilityName, 42) }}</span></td>
+                    <td>{{ capabilityActionLabel(row.capabilityAction) }}</td>
+                    <td>{{ row.userName || '-' }}</td>
+                    <td>
+                      <span :class="['badge', String(row.status).toUpperCase() === 'SUCCESS' ? 'badge-success' : 'badge-danger']">{{ row.status || '-' }}</span>
+                    </td>
+                    <td class="cell-mono" style="text-align: right">{{ row.durationMs ?? '-' }}</td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+            <div v-if="!loading && !rows.length" class="empty">
+              <span class="empty-icon"><Icon name="activity" :size="18" /></span>
+              <div class="empty-title">还没有调用记录</div>
+              <div class="empty-desc">通过 MCP Client 调用一次工具后，这里会出现审计流水。</div>
+            </div>
+          </section>
+        </template>
 
-              <div class="api-editor-tabs">
-                <button v-for="tab in ['params','headers','body','settings']" :key="tab" :class="{active: apiEditorTab === tab}" @click="apiEditorTab = tab">
-                  {{ { params:'Params', headers:'Headers', body:'Body', settings:'Settings' }[tab] }}
+        <!-- ------------------------------------------------------ admin lists -->
+        <template v-else-if="['users','roles','tokens','requests','dataSources','resources','tools','audits'].includes(page)">
+          <section class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">{{ title }}列表</div>
+                <div class="card-desc">共 {{ rows.length }} 条记录<span v-if="page === 'tools' || page === 'resources'"> · 由创作空间发布</span></div>
+              </div>
+              <div class="card-tools">
+                <label class="search-input">
+                  <Icon name="search" :size="13" />
+                  <input
+                    v-model="tableQuery"
+                    class="input"
+                    :placeholder="page === 'audits' ? '搜索能力名称、类型或用户' : '搜索名称或编码'"
+                  />
+                </label>
+                <button class="btn btn-outline btn-sm" :disabled="loading" @click="load">
+                  <Icon name="refresh" :size="13" /> 刷新
                 </button>
               </div>
+            </div>
 
-              <div class="api-editor-main">
-                <div class="api-editor-panel">
-                  <template v-if="apiEditorTab === 'params'">
-                    <div class="api-params-split">
-                      <section>
-                        <div class="api-panel-head">
-                          <b>默认参数 JSON</b>
-                          <span>保存到配置，后续 runRequest 默认带上</span>
-                        </div>
-                        <textarea v-model="model.paramsDefault" spellcheck="false" placeholder="填写 JSON 对象，例如 pageSize、token、默认查询条件"></textarea>
-                      </section>
-                      <section>
-                        <div class="api-panel-head">
-                          <b>本次调试参数 JSON</b>
-                          <button type="button" @click="apiEditorDebugParams = model.paramsDefault || '{}'">使用默认参数</button>
-                        </div>
-                        <textarea v-model="apiEditorDebugParams" spellcheck="false" placeholder="只用于本次点击发送，可覆盖默认参数里的同名字段"></textarea>
-                      </section>
+            <div class="table-wrap">
+              <table class="dt">
+                <thead>
+                  <tr>
+                    <th v-for="col in dataColumns" :key="col.dataIndex">{{ col.title }}</th>
+                    <th style="text-align: right">操作</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="row in tableRows" :key="row.id">
+                    <td v-for="col in dataColumns" :key="col.dataIndex">
+                      <span class="cell-truncate" :title="String(formatTableCell(col.dataIndex, row[col.dataIndex], row) ?? '')">
+                        {{ formatTableCell(col.dataIndex, row[col.dataIndex], row) }}
+                      </span>
+                    </td>
+                    <td class="cell-actions">
+                      <template v-if="page === 'users'">
+                        <button class="btn btn-outline btn-sm" @click="updateUserRoles(row)">分配角色</button>
+                        <button class="btn btn-ghost btn-sm" @click="edit(row)">编辑</button>
+                      </template>
+                      <template v-else-if="page === 'roles'">
+                        <button class="btn btn-outline btn-sm" @click="updateRoleTools(row)">工具</button>
+                        <button class="btn btn-outline btn-sm" @click="updateRolePrompts(row)">Prompt</button>
+                        <button class="btn btn-outline btn-sm" @click="updateRoleResources(row)">Resource</button>
+                        <button class="btn btn-ghost btn-sm" @click="edit(row)">编辑</button>
+                      </template>
+                      <template v-else-if="page === 'tokens'">
+                        <button class="btn btn-outline btn-sm" @click="updateSelections(row)">工具</button>
+                        <button class="btn btn-outline btn-sm" @click="updateTokenPromptSelections(row)">Prompt</button>
+                        <button class="btn btn-outline btn-sm" @click="updateTokenResourceSelections(row)">Resource</button>
+                        <button class="btn btn-ghost btn-sm" @click="edit(row)">编辑</button>
+                      </template>
+                      <template v-else-if="page === 'tools'">
+                        <button class="btn btn-outline btn-sm" @click="showDynamicToolDetail(row)">查看详情</button>
+                      </template>
+                      <template v-else-if="page === 'resources'">
+                        <button class="btn btn-outline btn-sm" @click="openResourceEditor(row)">查看资源</button>
+                        <button
+                          :class="['btn', 'btn-sm', Number(row.enabled) === 1 ? 'btn-danger' : 'btn-outline']"
+                          @click="toggleResourceEnabled(row)"
+                        >{{ Number(row.enabled) === 1 ? '禁用' : '启用' }}</button>
+                      </template>
+                      <template v-else-if="page === 'audits'">
+                        <button class="btn btn-outline btn-sm" @click="showAuditDetail(row)">查看详情</button>
+                      </template>
+                      <template v-else>
+                        <button class="btn btn-outline btn-sm" @click="edit(row)">编辑</button>
+                        <button v-if="page === 'dataSources'" class="btn btn-danger btn-sm" @click="removeRow(row)">删除</button>
+                      </template>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div v-if="!loading && !tableRows.length" class="empty">
+              <span class="empty-icon"><Icon name="box" :size="18" /></span>
+              <div class="empty-title">暂无{{ title }}数据</div>
+              <div class="empty-desc">
+                {{ page === 'tools' ? '动态工具在「创作空间 → Tools」里创建并发布后会出现在这里。' : '点击右上角新建，或先检查数据库初始化脚本是否已执行。' }}
+              </div>
+            </div>
+            <div v-else-if="tableRows.length" class="table-foot">
+              <span>显示 {{ tableRows.length }} / {{ rows.length }} 条</span>
+              <span>搜索对当前页全部字段生效</span>
+            </div>
+          </section>
+        </template>
+        <!-- ------------------------------------------------------ share hub -->
+        <template v-else-if="page === 'shareHome'">
+          <div class="stat-grid four">
+            <div v-for="item in [['Skills',communitySkills.length,'book'],['Tools',communityTools.length + communityBuiltinTools.length,'zap'],['Prompts',communityPrompts.length,'file'],['Resources',communityResources.length,'layers'],['API',communityApis.length,'globe']]" :key="item[0]" class="stat">
+              <div class="stat-top"><span class="stat-label">{{ item[0] }}</span><span class="stat-icon"><Icon :name="item[2]" :size="14" /></span></div>
+              <div class="stat-value">{{ item[1] }}</div>
+              <div class="stat-note">社区已发布能力</div>
+            </div>
+          </div>
+
+          <section class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">能力点赞榜</div>
+                <div class="card-desc">按点赞数排序，点击任意条目查看详情</div>
+              </div>
+              <div class="card-tools">
+                <button class="btn btn-outline btn-sm" :disabled="loading" @click="load"><Icon name="refresh" :size="13" /> 刷新</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="grid-cards four">
+                <div v-for="section in communityRankSections" :key="section.key" class="panel">
+                  <div class="panel-head">
+                    <b>{{ section.title }}</b>
+                    <button class="btn btn-ghost btn-sm" @click="changePage(section.page)">全部</button>
+                  </div>
+                  <div class="panel-body" style="padding: 6px">
+                    <button v-for="item in section.items" :key="item.id" class="list-item" @click="section.open(item)">
+                      <span class="truncate">{{ section.name(item) }}</span>
+                      <span class="tiny muted">{{ likeLabel(item) }}</span>
+                    </button>
+                    <div v-if="!section.items.length" class="empty" style="padding: 24px 12px">
+                      <div class="empty-desc">还没有数据</div>
                     </div>
-                  </template>
-                  <template v-else-if="apiEditorTab === 'headers'">
-                    <div class="api-panel-head"><b>请求头 JSON</b><button type="button">格式化</button></div>
-                    <textarea v-model="model.headers" spellcheck="false" placeholder="填写 JSON 对象，例如 Authorization、Content-Type"></textarea>
-                  </template>
-                  <template v-else-if="apiEditorTab === 'body'">
-                    <div class="api-panel-head"><b>Body 模板，支持 <code v-text="'{{key}}'"></code> 占位符</b><button type="button">格式化</button></div>
-                    <textarea v-model="model.bodyTemplate" spellcheck="false" placeholder="填写 POST/PUT 请求体模板，可使用占位符"></textarea>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <!-- --------------------------------------------- share: skills etc. -->
+        <template v-else-if="['shareSkills','shareTools','sharePrompts','shareResources','shareApis'].includes(page)">
+          <section class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">{{ title }} 市场</div>
+                <div class="card-desc">{{ desc }}</div>
+              </div>
+              <div class="card-tools">
+                <label class="search-input">
+                  <Icon name="search" :size="13" />
+                  <input v-model="communityKeyword" class="input" placeholder="搜索名称、编码或描述" />
+                </label>
+                <div v-if="page === 'shareTools'" class="segmented">
+                  <button :class="{ active: communityToolTypeFilter === 'all' }" @click="communityToolTypeFilter = 'all'">全部</button>
+                  <button :class="{ active: communityToolTypeFilter === 'dynamic' }" @click="communityToolTypeFilter = 'dynamic'">动态</button>
+                  <button :class="{ active: communityToolTypeFilter === 'builtin' }" @click="communityToolTypeFilter = 'builtin'">内置</button>
+                </div>
+                <button class="btn btn-outline btn-sm" :disabled="loading" @click="load"><Icon name="refresh" :size="13" /> 刷新</button>
+              </div>
+            </div>
+
+            <div class="card-body">
+              <div class="grid-cards">
+                <!-- skills -->
+                <template v-if="page === 'shareSkills'">
+                  <article v-for="item in filteredCommunitySkills" :key="item.id" class="tile">
+                    <div class="tile-head">
+                      <span class="tile-kicker"><Icon name="book" :size="13" /> Skill</span>
+                      <button class="btn btn-ghost btn-sm" @click="toggleCommunityLike(item)">{{ likeLabel(item) }}</button>
+                    </div>
+                    <div class="tile-title">{{ item.name || item.skillCode }}</div>
+                    <div class="tile-desc">{{ item.description || '暂无描述' }}</div>
+                    <div class="tile-meta">
+                      <code class="inline">{{ item.skillCode || communityCode('SKILL', item.id) }}</code>
+                      <span v-if="item.category" class="badge badge-outline">{{ item.category }}</span>
+                    </div>
+                    <div class="tile-foot">
+                      <button class="btn btn-primary btn-sm" @click="openCommunitySkillDetail(item)">查看</button>
+                      <button class="btn btn-outline btn-sm" @click="openCursorSkillInstall(item)">Cursor</button>
+                      <button class="btn btn-outline btn-sm" @click="copyCodexSkillInstall(item)">Codex</button>
+                      <button class="btn btn-ghost btn-sm" @click="downloadSkillZip(item)"><Icon name="download" :size="13" /> ZIP</button>
+                    </div>
+                  </article>
+                  <div v-if="!filteredCommunitySkills.length" class="empty">
+                    <span class="empty-icon"><Icon name="book" :size="18" /></span>
+                    <div class="empty-title">还没有公开的 Skill</div>
+                    <div class="empty-desc">在创作空间创建 Skill 并选择「公开」，就会出现在这里。</div>
+                    <button class="btn btn-primary btn-sm" @click="changePage('studioSkills')">去创建</button>
+                  </div>
+                </template>
+
+                <!-- tools -->
+                <template v-else-if="page === 'shareTools'">
+                  <article v-for="item in filteredCommunityTools" :key="communityToolCode(item)" class="tile">
+                    <div class="tile-head">
+                      <span class="tile-kicker"><Icon name="zap" :size="13" /> {{ item.communityType === 'builtin' ? '内置工具' : '动态工具' }}</span>
+                      <button class="btn btn-ghost btn-sm" @click="toggleCommunityLike(item)">{{ likeLabel(item) }}</button>
+                    </div>
+                    <div class="tile-title">{{ item.displayName || item.toolName }}</div>
+                    <div class="tile-desc">{{ item.displayDescription || '暂无描述' }}</div>
+                    <div class="tile-meta">
+                      <code class="inline">{{ communityToolCode(item) }}</code>
+                      <span class="badge badge-outline">{{ communityToolCountLabel(item) }}</span>
+                    </div>
+                    <div class="tile-foot">
+                      <button class="btn btn-primary btn-sm" @click="openCommunityToolDetail(item)">查看</button>
+                    </div>
+                  </article>
+                  <div v-if="!filteredCommunityTools.length" class="empty">
+                    <span class="empty-icon"><Icon name="zap" :size="18" /></span>
+                    <div class="empty-title">还没有匹配的工具</div>
+                    <div class="empty-desc">调整筛选条件，或到创作空间发布动态工具。</div>
+                  </div>
+                </template>
+
+                <!-- prompts -->
+                <template v-else-if="page === 'sharePrompts'">
+                  <article v-for="item in filteredCommunityPrompts" :key="item.id" class="tile">
+                    <div class="tile-head">
+                      <span class="tile-kicker"><Icon name="file" :size="13" /> Prompt</span>
+                      <button class="btn btn-ghost btn-sm" @click="toggleCommunityLike(item)">{{ likeLabel(item) }}</button>
+                    </div>
+                    <div class="tile-title">{{ item.title || item.promptName }}</div>
+                    <div class="tile-desc">{{ item.description || '暂无描述' }}</div>
+                    <div class="tile-meta">
+                      <code class="inline">{{ item.promptName }}</code>
+                      <span class="badge badge-outline">{{ parseJsonArray(item.argumentsSchema).length }} 个参数</span>
+                    </div>
+                    <div class="tile-foot">
+                      <button class="btn btn-primary btn-sm" @click="openCommunityPromptDetail(item)">查看</button>
+                    </div>
+                  </article>
+                  <div v-if="!filteredCommunityPrompts.length" class="empty">
+                    <span class="empty-icon"><Icon name="file" :size="18" /></span>
+                    <div class="empty-title">还没有公开的 Prompt</div>
+                    <div class="empty-desc">Prompt 模板可以在创作空间里编辑并公开。</div>
+                    <button class="btn btn-primary btn-sm" @click="changePage('studioPrompts')">去创建</button>
+                  </div>
+                </template>
+
+                <!-- resources -->
+                <template v-else-if="page === 'shareResources'">
+                  <article v-for="item in filteredCommunityResources" :key="item.id" class="tile">
+                    <div class="tile-head">
+                      <span class="tile-kicker"><Icon name="layers" :size="13" /> Resource</span>
+                      <button class="btn btn-ghost btn-sm" @click="toggleCommunityLike(item)">{{ likeLabel(item) }}</button>
+                    </div>
+                    <div class="tile-title">{{ item.name }}</div>
+                    <div class="tile-desc">{{ item.description || '暂无描述' }}</div>
+                    <div class="tile-meta">
+                      <code class="inline">{{ item.resourceUri }}</code>
+                      <span class="badge badge-outline">{{ item.mimeType || 'text/markdown' }}</span>
+                    </div>
+                    <div class="tile-foot">
+                      <button class="btn btn-primary btn-sm" @click="openCommunityResourceDetail(item)">查看</button>
+                    </div>
+                  </article>
+                  <div v-if="!filteredCommunityResources.length" class="empty">
+                    <span class="empty-icon"><Icon name="layers" :size="18" /></span>
+                    <div class="empty-title">还没有公开的 Resource</div>
+                    <div class="empty-desc">Resource 用于给 MCP Client 提供只读知识片段。</div>
+                    <button class="btn btn-primary btn-sm" @click="changePage('studioResources')">去创建</button>
+                  </div>
+                </template>
+
+                <!-- apis -->
+                <template v-else>
+                  <article v-for="item in filteredCommunityApis" :key="item.id" class="tile">
+                    <div class="tile-head">
+                      <span class="tile-kicker"><Icon name="globe" :size="13" /> API</span>
+                      <button class="btn btn-ghost btn-sm" @click="toggleCommunityLike(item)">{{ likeLabel(item) }}</button>
+                    </div>
+                    <div class="tile-title">{{ item.name }}</div>
+                    <div class="tile-desc">{{ item.description || '暂无描述' }}</div>
+                    <div class="tile-meta">
+                      <span class="badge badge-primary">{{ item.method || 'GET' }}</span>
+                      <code class="inline">{{ item.configKey }}</code>
+                      <span v-if="item.category" class="badge badge-outline">{{ item.category }}</span>
+                    </div>
+                    <div class="tile-foot">
+                      <button class="btn btn-primary btn-sm" @click="openCommunityApiDetail(item)">查看</button>
+                    </div>
+                  </article>
+                  <div v-if="!filteredCommunityApis.length" class="empty">
+                    <span class="empty-icon"><Icon name="globe" :size="18" /></span>
+                    <div class="empty-title">还没有公开的 API</div>
+                    <div class="empty-desc">先把外部 HTTP 接口接入创作空间，再发布为能力。</div>
+                    <button class="btn btn-primary btn-sm" @click="changePage('studioApis')">去创建</button>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <!-- --------------------------------------------------- share config -->
+        <template v-else-if="page === 'shareConfig'">
+          <div class="split">
+            <section class="card">
+              <div class="card-head">
+                <div class="card-title">我的 Token</div>
+                <div class="card-tools">
+                  <button class="btn btn-ghost btn-sm" @click="changePage('shareTokens')">管理</button>
+                </div>
+              </div>
+              <div class="card-body tight">
+                <div class="list">
+                  <button
+                    v-for="token in rows"
+                    :key="token.id"
+                    :class="['list-item', { active: activeConfigTokenId === token.id }]"
+                    @click="activeConfigTokenId = token.id; applyConfigTokenSelections()"
+                  >
+                    <span class="truncate">{{ token.tokenName }}</span>
+                    <span :class="['badge', Number(token.isActive) === 1 ? 'badge-success' : 'badge-outline']">{{ Number(token.isActive) === 1 ? '启用' : '禁用' }}</span>
+                  </button>
+                  <div v-if="!rows.length" class="empty" style="padding: 24px 12px">
+                    <div class="empty-title">还没有 Token</div>
+                    <div class="empty-desc">先创建一个 Token，再来挑选能力。</div>
+                    <button class="btn btn-primary btn-sm" @click="changePage('shareTokens')">新建 Token</button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-head">
+                <div>
+                  <div class="card-title">能力选择</div>
+                  <div class="card-desc">{{ activeConfigTokenId ? '勾选要暴露给这个 Token 的能力，保存后立即生效' : '请先在左侧选择一个 Token' }}</div>
+                </div>
+                <div class="card-tools">
+                  <button class="btn btn-outline btn-sm" :disabled="!activeConfigTokenId" @click="installShareConfigToCursor">
+                    <Icon name="terminal" :size="13" /> 一键配置到 Cursor
+                  </button>
+                  <button class="btn btn-primary btn-sm" :disabled="!activeConfigTokenId" @click="saveShareMcpConfig">
+                    <Icon name="save" :size="13" /> 保存配置
+                  </button>
+                </div>
+              </div>
+
+              <div class="card-body">
+                <div class="section">
+                  <div class="section-head">
+                    <div class="section-title">Tools</div>
+                    <div style="display: flex; gap: 6px">
+                      <button class="btn btn-ghost btn-sm" @click="selectShareToolGroup('builtin')">全选内置</button>
+                      <button class="btn btn-ghost btn-sm" @click="clearShareToolGroup('builtin')">清空内置</button>
+                      <button class="btn btn-ghost btn-sm" @click="selectShareToolGroup('dynamic')">全选动态</button>
+                      <button class="btn btn-ghost btn-sm" @click="clearShareToolGroup('dynamic')">清空动态</button>
+                      <button class="btn btn-ghost btn-sm" @click="selectShareToolGroup('feishu')">全选飞书</button>
+                    </div>
+                  </div>
+                  <div class="check-grid three">
+                    <label v-for="tool in builtinTools" :key="'b-' + tool.name" class="check-item">
+                      <input v-model="selectedTokenTools" type="checkbox" :value="tool.name" />
+                      <span><b>{{ tool.name }}</b><br /><small class="muted">{{ tool.description }}</small></span>
+                    </label>
+                    <label v-for="tool in dynamicToolOptions" :key="'d-' + tool.toolName" class="check-item">
+                      <input v-model="selectedTokenTools" type="checkbox" :value="tool.toolName" />
+                      <span><b>{{ tool.toolName }}</b><br /><small class="muted">{{ tool.toolDescription || '动态工具' }}</small></span>
+                    </label>
+                    <label v-for="tool in feishuToolOptions" :key="'f-' + tool.toolName" class="check-item">
+                      <input v-model="selectedTokenTools" type="checkbox" :value="tool.toolName" />
+                      <span><b>{{ tool.toolName }}</b><br /><small class="muted">{{ tool.toolDescription || '飞书工具' }}</small></span>
+                    </label>
+                  </div>
+                </div>
+
+                <div class="section">
+                  <div class="section-head">
+                    <div class="section-title">Prompts</div>
+                    <div style="display: flex; gap: 6px">
+                      <button class="btn btn-ghost btn-sm" @click="selectedTokenPrompts = selectablePromptNames()">全选</button>
+                      <button class="btn btn-ghost btn-sm" @click="selectedTokenPrompts = []">清空</button>
+                    </div>
+                  </div>
+                  <div class="check-grid">
+                    <label v-for="prompt in promptOptions" :key="prompt.promptName" class="check-item">
+                      <input v-model="selectedTokenPrompts" type="checkbox" :value="prompt.promptName" />
+                      <span><b>{{ prompt.title || prompt.promptName }}</b><br /><small class="muted">{{ prompt.description || prompt.promptName }}</small></span>
+                    </label>
+                    <div v-if="!promptOptions.length" class="hint">没有可用的 Prompt</div>
+                  </div>
+                </div>
+
+                <div class="section">
+                  <div class="section-head">
+                    <div class="section-title">Resources</div>
+                    <div style="display: flex; gap: 6px">
+                      <button class="btn btn-ghost btn-sm" @click="selectedTokenResources = selectableResourceUris()">全选</button>
+                      <button class="btn btn-ghost btn-sm" @click="selectedTokenResources = []">清空</button>
+                    </div>
+                  </div>
+                  <div class="check-grid">
+                    <label v-for="resource in resourceOptions" :key="resource.resourceUri" class="check-item">
+                      <input v-model="selectedTokenResources" type="checkbox" :value="resource.resourceUri" />
+                      <span><b>{{ resource.name }}</b><br /><small class="muted">{{ resource.resourceUri }}</small></span>
+                    </label>
+                    <div v-if="!resourceOptions.length" class="hint">没有可用的 Resource</div>
+                  </div>
+                </div>
+              </div>
+            </section>
+          </div>
+        </template>
+
+        <!-- ---------------------------------------------------- share tokens -->
+        <template v-else-if="page === 'shareTokens'">
+          <section class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">我的 Token</div>
+                <div class="card-desc">共 {{ rows.length }} 个 · 新建后会弹出一次性明文，请立即保存</div>
+              </div>
+              <div class="card-tools">
+                <button class="btn btn-primary btn-sm" @click="openCreate"><Icon name="plus" :size="13" /> 新建 Token</button>
+                <button class="btn btn-outline btn-sm" :disabled="loading" @click="load"><Icon name="refresh" :size="13" /> 刷新</button>
+              </div>
+            </div>
+            <div class="card-body">
+              <div class="grid-cards">
+                <article v-for="token in rows" :key="token.id" class="tile">
+                  <div class="tile-head">
+                    <span class="tile-kicker"><Icon name="key" :size="13" /> Token</span>
+                    <span :class="['badge', Number(token.isActive) === 1 ? 'badge-success' : 'badge-outline']">{{ Number(token.isActive) === 1 ? '启用' : '禁用' }}</span>
+                  </div>
+                  <div class="tile-title">{{ token.tokenName }}</div>
+                  <div class="tile-desc">{{ token.tokenPrefix || '' }}<span class="muted small"> · {{ permissionLabel(token.permissions) }}</span></div>
+                  <div class="tile-meta">
+                    <span class="badge badge-outline">过期：{{ token.expireTime || '不过期' }}</span>
+                    <span class="badge badge-outline">最后使用：{{ token.lastUsedTime || '未使用' }}</span>
+                  </div>
+                  <div class="tile-foot">
+                    <button class="btn btn-outline btn-sm" @click="edit(token)">编辑</button>
+                    <button class="btn btn-ghost btn-sm" @click="updateSelections(token)">工具</button>
+                    <button class="btn btn-ghost btn-sm" @click="updateTokenPromptSelections(token)">Prompt</button>
+                    <button class="btn btn-ghost btn-sm" @click="updateTokenResourceSelections(token)">Resource</button>
+                  </div>
+                </article>
+                <div v-if="!rows.length" class="empty">
+                  <span class="empty-icon"><Icon name="key" :size="18" /></span>
+                  <div class="empty-title">还没有 Token</div>
+                  <div class="empty-desc">创建一个 Token，即可在 Cursor / Codex 中接入这个 MCP Server。</div>
+                  <button class="btn btn-primary btn-sm" @click="openCreate">新建 Token</button>
+                </div>
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <!-- ---------------------------------------------------- studio home -->
+        <template v-else-if="page === 'studioHome'">
+          <section class="card">
+            <div class="card-body">
+              <div class="row between wrap" style="gap: 16px">
+                <div>
+                  <div class="page-kicker">MCP Studio</div>
+                  <h2 style="margin: 4px 0 6px">把内部能力接成 MCP 能力</h2>
+                  <p class="muted small" style="margin: 0">请求配置 → 动态工具 → Prompt / Resource / Skill，全部在这里编排。</p>
+                </div>
+                <div style="display: flex; gap: 8px">
+                  <button class="btn btn-primary" @click="changePage('studioApis')"><Icon name="globe" :size="14" /> 接入 API</button>
+                  <button class="btn btn-outline" @click="changePage('studioTools')"><Icon name="zap" :size="14" /> 创建 Tool</button>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <div class="stat-grid three" style="margin-top: 16px">
+            <div class="stat">
+              <div class="stat-top"><span class="stat-label">已接 API</span><span class="stat-icon"><Icon name="globe" :size="14" /></span></div>
+              <div class="stat-value">{{ studioApiStats.all }}</div>
+              <div class="stat-note">已上线 {{ studioApiStats.online }} · 草稿 {{ studioApiStats.draft }}</div>
+            </div>
+            <div class="stat">
+              <div class="stat-top"><span class="stat-label">动态工具</span><span class="stat-icon"><Icon name="zap" :size="14" /></span></div>
+              <div class="stat-value">{{ filteredStudioTools.length }}</div>
+              <div class="stat-note">Groovy 脚本编排</div>
+            </div>
+            <div class="stat">
+              <div class="stat-top"><span class="stat-label">发布入口</span><span class="stat-icon"><Icon name="rocket" :size="14" /></span></div>
+              <div class="stat-value">{{ filteredStudioSkills.length + filteredStudioPrompts.length + filteredStudioResources.length }}</div>
+              <div class="stat-note">Skill / Prompt / Resource</div>
+            </div>
+          </div>
+
+          <div class="grid-cards" style="margin-top: 16px">
+            <article
+              v-for="lane in [
+                { key: 'studioSkills', title: 'Skills', icon: 'book', desc: '把排查流程、写作规范沉淀成可安装的 Skill 包。', count: filteredStudioSkills.length },
+                { key: 'studioTools', title: 'Tools', icon: 'zap', desc: '用 Groovy 把多个 API 组合成一个原子工具。', count: filteredStudioTools.length },
+                { key: 'studioPrompts', title: 'Prompts', icon: 'file', desc: '可复用的提示词模板，支持参数与工具白名单。', count: filteredStudioPrompts.length },
+                { key: 'studioResources', title: 'Resources', icon: 'layers', desc: '只读知识片段，供客户端按 URI 拉取。', count: filteredStudioResources.length },
+                { key: 'studioApis', title: 'API', icon: 'globe', desc: '把外部 HTTP 接口注册成可调试的请求配置。', count: studioApiStats.all }
+              ]"
+              :key="lane.key"
+              class="tile"
+            >
+              <div class="tile-head">
+                <span class="tile-kicker"><Icon :name="lane.icon" :size="13" /> {{ lane.title }}</span>
+                <span class="badge badge-outline">{{ lane.count }}</span>
+              </div>
+              <div class="tile-desc">{{ lane.desc }}</div>
+              <div class="tile-foot">
+                <button class="btn btn-outline btn-sm" @click="changePage(lane.key)">进入<Icon name="chevron-right" :size="13" /></button>
+              </div>
+            </article>
+          </div>
+        </template>
+        <!-- ------------------------------------------- studio list: 5 kinds -->
+        <template v-else-if="['studioSkills','studioTools','studioPrompts','studioResources','studioApis'].includes(page)">
+          <section class="card">
+            <div class="card-head">
+              <div>
+                <div class="card-title">{{ title }}</div>
+                <div class="card-desc">{{ desc }}</div>
+              </div>
+              <div class="card-tools">
+                <label class="search-input">
+                  <Icon name="search" :size="13" />
+                  <input
+                    class="input"
+                    :placeholder="'搜索 ' + title"
+                    :value="page === 'studioSkills' ? skillKeyword : page === 'studioTools' ? toolKeyword : page === 'studioPrompts' ? promptKeyword : page === 'studioResources' ? resourceKeyword : apiKeyword"
+                    @input="page === 'studioSkills' ? skillKeyword = $event.target.value : page === 'studioTools' ? toolKeyword = $event.target.value : page === 'studioPrompts' ? promptKeyword = $event.target.value : page === 'studioResources' ? resourceKeyword = $event.target.value : apiKeyword = $event.target.value"
+                  />
+                </label>
+                <div class="segmented">
+                  <button
+                    :class="{ active: (page === 'studioSkills' ? skillStatusFilter : page === 'studioTools' ? toolStatusFilter : page === 'studioPrompts' ? promptStatusFilter : page === 'studioResources' ? resourceStatusFilter : apiStatusFilter) === 'all' }"
+                    @click="page === 'studioSkills' ? skillStatusFilter = 'all' : page === 'studioTools' ? toolStatusFilter = 'all' : page === 'studioPrompts' ? promptStatusFilter = 'all' : page === 'studioResources' ? resourceStatusFilter = 'all' : apiStatusFilter = 'all'"
+                  >全部</button>
+                  <button
+                    :class="{ active: (page === 'studioSkills' ? skillStatusFilter : page === 'studioTools' ? toolStatusFilter : page === 'studioPrompts' ? promptStatusFilter : page === 'studioResources' ? resourceStatusFilter : apiStatusFilter) === 'online' }"
+                    @click="page === 'studioSkills' ? skillStatusFilter = 'online' : page === 'studioTools' ? toolStatusFilter = 'online' : page === 'studioPrompts' ? promptStatusFilter = 'online' : page === 'studioResources' ? resourceStatusFilter = 'online' : apiStatusFilter = 'online'"
+                  >已上线</button>
+                  <button
+                    :class="{ active: (page === 'studioSkills' ? skillStatusFilter : page === 'studioTools' ? toolStatusFilter : page === 'studioPrompts' ? promptStatusFilter : page === 'studioResources' ? resourceStatusFilter : apiStatusFilter) === 'draft' }"
+                    @click="page === 'studioSkills' ? skillStatusFilter = 'draft' : page === 'studioTools' ? toolStatusFilter = 'draft' : page === 'studioPrompts' ? promptStatusFilter = 'draft' : page === 'studioResources' ? resourceStatusFilter = 'draft' : apiStatusFilter = 'draft'"
+                  >草稿</button>
+                </div>
+                <button class="btn btn-primary btn-sm" @click="openCreate"><Icon name="plus" :size="13" /> 新建</button>
+              </div>
+            </div>
+
+            <div class="card-body">
+              <div class="grid-cards">
+                <!-- skills -->
+                <template v-if="page === 'studioSkills'">
+                  <article v-for="item in filteredStudioSkills" :key="item.id" class="tile">
+                    <div class="tile-head">
+                      <span class="tile-kicker"><Icon name="book" :size="13" /> Skill</span>
+                      <div style="display: flex; gap: 4px">
+                        <span :class="['badge', publishClass(item.publishStatus)]">{{ publishLabel(item.publishStatus) }}</span>
+                        <span class="badge badge-outline">{{ visibilityLabel(item.publishStatus) }}</span>
+                      </div>
+                    </div>
+                    <div class="tile-title">{{ item.name }}</div>
+                    <div class="tile-desc">{{ item.description || '暂无描述' }}</div>
+                    <div class="tile-meta">
+                      <code class="inline">{{ item.skillCode }}</code>
+                      <span v-if="item.category" class="badge badge-outline">{{ item.category }}</span>
+                      <span v-if="item.userName" class="badge badge-outline">{{ item.userName }}</span>
+                    </div>
+                    <div class="tile-foot">
+                      <button class="btn btn-outline btn-sm" @click="openSkillEditor(item)">编辑</button>
+                      <button class="btn btn-ghost btn-sm" @click="toggleOnlineSkill(item)">{{ onlineActionLabel(item.publishStatus) }}</button>
+                      <button class="btn btn-ghost btn-sm" :disabled="Number(item.publishStatus) === 0" @click="toggleVisibilitySkill(item)">{{ visibilityActionLabel(item.publishStatus) }}</button>
+                    </div>
+                  </article>
+                  <div v-if="!filteredStudioSkills.length" class="empty">
+                    <span class="empty-icon"><Icon name="book" :size="18" /></span>
+                    <div class="empty-title">还没有 Skill</div>
+                    <div class="empty-desc">新建 → 上传 SKILL.md → 上线，就能被客户端安装。</div>
+                    <button class="btn btn-primary btn-sm" @click="openSkillEditor()">新建 Skill</button>
+                  </div>
+                </template>
+
+                <!-- tools -->
+                <template v-else-if="page === 'studioTools'">
+                  <article v-for="item in filteredStudioTools" :key="item.id" class="tile">
+                    <div class="tile-head">
+                      <span class="tile-kicker"><Icon name="zap" :size="13" /> Tool</span>
+                      <div style="display: flex; gap: 4px">
+                        <span :class="['badge', publishClass(item.publishStatus)]">{{ publishLabel(item.publishStatus) }}</span>
+                        <span class="badge badge-outline">{{ visibilityLabel(item.publishStatus) }}</span>
+                      </div>
+                    </div>
+                    <div class="tile-title">{{ item.toolName }}</div>
+                    <div class="tile-desc">{{ item.toolDescription || '暂无描述' }}</div>
+                    <div class="tile-meta">
+                      <span class="badge badge-outline">{{ linkedRequestLabel(item.linkedRequestKeys) }}</span>
+                      <span class="badge badge-outline">{{ linkedDataSourceLabel(item.linkedDataSourceIds) }}</span>
+                    </div>
+                    <div class="tile-foot">
+                      <button class="btn btn-outline btn-sm" @click="openToolEditor(item)">编辑</button>
+                      <button class="btn btn-ghost btn-sm" @click="toggleOnlineTool(item)">{{ onlineActionLabel(item.publishStatus) }}</button>
+                      <button class="btn btn-ghost btn-sm" :disabled="Number(item.publishStatus) === 0" @click="toggleVisibilityTool(item)">{{ visibilityActionLabel(item.publishStatus) }}</button>
+                    </div>
+                  </article>
+                  <div v-if="!filteredStudioTools.length" class="empty">
+                    <span class="empty-icon"><Icon name="zap" :size="18" /></span>
+                    <div class="empty-title">还没有动态工具</div>
+                    <div class="empty-desc">选择已接入的 API，自动生成 Groovy 脚本与 inputSchema。</div>
+                    <button class="btn btn-primary btn-sm" @click="openToolEditor()">新建 Tool</button>
+                  </div>
+                </template>
+
+                <!-- prompts -->
+                <template v-else-if="page === 'studioPrompts'">
+                  <article v-for="item in filteredStudioPrompts" :key="item.id" class="tile">
+                    <div class="tile-head">
+                      <span class="tile-kicker"><Icon name="file" :size="13" /> Prompt</span>
+                      <div style="display: flex; gap: 4px">
+                        <span :class="['badge', publishClass(item.publishStatus)]">{{ publishLabel(item.publishStatus) }}</span>
+                        <span class="badge badge-outline">{{ visibilityLabel(item.publishStatus) }}</span>
+                      </div>
+                    </div>
+                    <div class="tile-title">{{ item.title || item.promptName }}</div>
+                    <div class="tile-desc">{{ item.description || '暂无描述' }}</div>
+                    <div class="tile-meta">
+                      <code class="inline">{{ item.promptName }}</code>
+                      <span class="badge badge-outline">{{ parseJsonArray(item.argumentsSchema).length }} 个参数</span>
+                    </div>
+                    <div class="tile-foot">
+                      <button class="btn btn-outline btn-sm" @click="openPromptEditor(item)">编辑</button>
+                      <button class="btn btn-ghost btn-sm" @click="toggleOnlinePrompt(item)">{{ onlineActionLabel(item.publishStatus) }}</button>
+                      <button class="btn btn-ghost btn-sm" :disabled="Number(item.publishStatus) === 0" @click="toggleVisibilityPrompt(item)">{{ visibilityActionLabel(item.publishStatus) }}</button>
+                    </div>
+                  </article>
+                  <div v-if="!filteredStudioPrompts.length" class="empty">
+                    <span class="empty-icon"><Icon name="file" :size="18" /></span>
+                    <div class="empty-title">还没有 Prompt</div>
+                    <div class="empty-desc">用双花括号占位符书写模板，可绑定工具白名单。</div>
+                    <button class="btn btn-primary btn-sm" @click="openPromptEditor()">新建 Prompt</button>
+                  </div>
+                </template>
+
+                <!-- resources -->
+                <template v-else-if="page === 'studioResources'">
+                  <article v-for="item in filteredStudioResources" :key="item.id" class="tile">
+                    <div class="tile-head">
+                      <span class="tile-kicker"><Icon name="layers" :size="13" /> Resource</span>
+                      <div style="display: flex; gap: 4px">
+                        <span :class="['badge', publishClass(item.publishStatus)]">{{ publishLabel(item.publishStatus) }}</span>
+                        <span class="badge badge-outline">{{ visibilityLabel(item.publishStatus) }}</span>
+                      </div>
+                    </div>
+                    <div class="tile-title">{{ item.name }}</div>
+                    <div class="tile-desc">{{ item.description || '暂无描述' }}</div>
+                    <div class="tile-meta">
+                      <code class="inline">{{ item.resourceUri }}</code>
+                      <span class="badge badge-outline">{{ item.mimeType || 'text/markdown' }}</span>
+                    </div>
+                    <div class="tile-foot">
+                      <button class="btn btn-outline btn-sm" @click="openResourceEditor(item)">编辑</button>
+                      <button class="btn btn-ghost btn-sm" @click="toggleOnlineResource(item)">{{ onlineActionLabel(item.publishStatus) }}</button>
+                      <button class="btn btn-ghost btn-sm" :disabled="Number(item.publishStatus) === 0" @click="toggleVisibilityResource(item)">{{ visibilityActionLabel(item.publishStatus) }}</button>
+                    </div>
+                  </article>
+                  <div v-if="!filteredStudioResources.length" class="empty">
+                    <span class="empty-icon"><Icon name="layers" :size="18" /></span>
+                    <div class="empty-title">还没有 Resource</div>
+                    <div class="empty-desc">上传 Markdown 或直接粘贴内容，按 URI 暴露给客户端。</div>
+                    <button class="btn btn-primary btn-sm" @click="openResourceEditor()">新建 Resource</button>
+                  </div>
+                </template>
+
+                <!-- apis -->
+                <template v-else>
+                  <article v-for="item in filteredStudioApis" :key="item.id" class="tile">
+                    <div class="tile-head">
+                      <span class="tile-kicker"><Icon name="globe" :size="13" /> API</span>
+                      <div style="display: flex; gap: 4px">
+                        <span :class="['badge', publishClass(item.publishStatus)]">{{ publishLabel(item.publishStatus) }}</span>
+                        <span class="badge badge-outline">{{ visibilityLabel(item.publishStatus) }}</span>
+                      </div>
+                    </div>
+                    <div class="tile-title">{{ item.name }}</div>
+                    <div class="tile-desc">{{ item.description || '暂无描述' }}</div>
+                    <div class="tile-meta">
+                      <span class="badge badge-primary">{{ item.method || 'GET' }}</span>
+                      <code class="inline">{{ item.configKey }}</code>
+                    </div>
+                    <code class="inline block" style="display: block; margin-top: 8px">{{ item.url }}</code>
+                    <div class="tile-foot">
+                      <button class="btn btn-outline btn-sm" @click="openApiEditor(item)">编辑</button>
+                      <button class="btn btn-ghost btn-sm" @click="openApiDebug(item)">调试</button>
+                      <button class="btn btn-ghost btn-sm" @click="toggleOnlineApi(item)">{{ onlineActionLabel(item.publishStatus) }}</button>
+                      <button class="btn btn-ghost btn-sm" :disabled="Number(item.publishStatus) === 0" @click="toggleVisibilityApi(item)">{{ visibilityActionLabel(item.publishStatus) }}</button>
+                    </div>
+                  </article>
+                  <div v-if="!filteredStudioApis.length" class="empty">
+                    <span class="empty-icon"><Icon name="globe" :size="18" /></span>
+                    <div class="empty-title">还没有接入 API</div>
+                    <div class="empty-desc">填写 URL、Header 与 Body 模板，保存后即可调试并发布。</div>
+                    <button class="btn btn-primary btn-sm" @click="openApiEditor()">接入第一个 API</button>
+                  </div>
+                </template>
+              </div>
+            </div>
+          </section>
+        </template>
+
+        <!-- ------------------------------------------------------ API editor -->
+        <template v-else-if="page === 'studioApiEdit'">
+          <div class="editor">
+            <header class="editor-head">
+              <div class="editor-head-main">
+                <button class="btn btn-ghost btn-sm" @click="changePage('studioApis')"><Icon name="arrow-left" :size="14" /> 返回</button>
+                <div>
+                  <div class="page-kicker">API Studio</div>
+                  <h2 class="page-title" style="font-size: 19px">{{ model.name || model.configKey || '未命名 API' }}</h2>
+                </div>
+              </div>
+              <div class="editor-actions">
+                <span :class="['badge', publishClass(model.publishStatus)]">{{ publishLabel(model.publishStatus) }}</span>
+                <span class="badge badge-outline">{{ visibilityLabel(model.publishStatus) }}</span>
+                <button class="btn btn-outline btn-sm" @click="openApiDebug(model)">调试</button>
+                <button class="btn btn-primary btn-sm" :disabled="apiSaving" @click="saveApiEditor">
+                  <Icon name="save" :size="13" /> {{ apiSaving ? '保存中…' : '保存' }}
+                </button>
+              </div>
+            </header>
+
+            <div class="editor-board">
+              <section class="panel">
+                <div class="panel-head">基础信息</div>
+                <div class="panel-body">
+                  <div class="field"><span class="field-label">配置键 configKey</span><input v-model="model.configKey" class="input" placeholder="demo_user_detail" /></div>
+                  <div class="field"><span class="field-label">名称</span><input v-model="model.name" class="input" placeholder="查询演示用户详情" /></div>
+                  <div class="field"><span class="field-label">分类</span><input v-model="model.category" class="input" placeholder="演示" /></div>
+                  <div class="field-row">
+                    <div class="field">
+                      <span class="field-label">方法</span>
+                      <select v-model="model.method" class="select">
+                        <option v-for="opt in httpMethodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                      </select>
+                    </div>
+                    <div class="field">
+                      <span class="field-label">类型</span>
+                      <select v-model="model.type" class="select">
+                        <option v-for="opt in requestTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="field"><span class="field-label">URL</span><input v-model="model.url" class="input" placeholder="http://localhost:8080/api/demo/users/{userId}" /></div>
+                  <div class="field"><span class="field-label">描述</span><textarea v-model="model.description" class="textarea" rows="3" placeholder="给调用方看的说明"></textarea></div>
+                  <div class="field-row">
+                    <div class="field"><span class="field-label">连接超时(ms)</span><input v-model.number="model.connectTimeoutMs" class="input" type="number" /></div>
+                    <div class="field"><span class="field-label">读取超时(ms)</span><input v-model.number="model.readTimeoutMs" class="input" type="number" /></div>
+                  </div>
+                  <div class="field">
+                    <span class="field-label">发布状态</span>
+                    <select v-model.number="model.publishStatus" class="select">
+                      <option v-for="opt in publishStatusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                    <span class="field-hint">草稿不会出现在 Tools 列表；「公开」会进入社区。</span>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head">
+                  <div class="tabs">
+                    <button :class="['tab', { active: apiEditorTab !== 'response' }]" @click="apiEditorTab = 'request'">请求</button>
+                    <button :class="['tab', { active: apiEditorTab === 'response' }]" @click="apiEditorTab = 'response'">调试</button>
+                  </div>
+                </div>
+                <div class="panel-body">
+                  <template v-if="apiEditorTab !== 'response'">
+                    <div class="field"><span class="field-label">默认参数 paramsDefault (JSON)</span><textarea v-model="model.paramsDefault" class="textarea code-input" rows="6" placeholder='{"userId": 1}'></textarea></div>
+                    <div class="field"><span class="field-label">请求头 headers (JSON)</span><textarea v-model="model.headers" class="textarea code-input" rows="5" placeholder='{"Content-Type": "application/json"}'></textarea></div>
+                    <div class="field"><span class="field-label">Body 模板（支持双花括号占位）</span><textarea v-model="model.bodyTemplate" class="textarea code-input" rows="8" placeholder='{"keyword": "{keyword}", "page": 1}'></textarea></div>
                   </template>
                   <template v-else>
-                    <div class="api-settings-grid">
-                      <label><span>连接超时 (ms)</span><input v-model.number="model.connectTimeoutMs" type="number" min="0" /></label>
-                      <label><span>读取超时 (ms)</span><input v-model.number="model.readTimeoutMs" type="number" min="0" /></label>
-                      <label><span>每分钟限流</span><input v-model.number="model.rateLimitPerMinute" type="number" min="0" /></label>
-                      <label><span>分类</span><input v-model="model.category" placeholder="例如：search" /></label>
+                    <div class="field"><span class="field-label">调试参数 (JSON)</span><textarea v-model="apiEditorDebugParams" class="textarea code-input" rows="6" placeholder='{"userId": 1}'></textarea></div>
+                    <button class="btn btn-primary btn-sm" :disabled="debugLoading" @click="sendApiEditor">
+                      <Icon name="play" :size="13" /> {{ debugLoading ? '请求中…' : '发送请求' }}
+                    </button>
+                    <div class="section">
+                      <div class="section-head"><div class="section-title">响应</div><span class="tiny muted">{{ debugSummary }}</span></div>
+                      <pre class="code tall">{{ prettyJsonText(debugResult) }}</pre>
                     </div>
-                    <label class="api-description-field">
-                      <span>接口描述</span>
-                      <textarea v-model="model.description" spellcheck="false" placeholder="简要说明接口用途"></textarea>
-                    </label>
                   </template>
                 </div>
-
-                <aside class="api-response-panel">
-                  <div class="api-response-head">
-                    <b>响应输出</b>
-                    <span v-if="debugResult" :class="['api-debug-state', debugResult.success ? 'success' : 'error']">
-                      {{ debugResult.success ? '调试成功' : '调试失败' }}
-                      <small v-if="debugResult.durationMs != null">{{ debugResult.durationMs }} ms</small>
-                    </span>
-                    <span v-else>状态码 · 响应体 · 耗时</span>
-                  </div>
-                  <div v-if="debugResult && !debugResult.success" class="api-debug-error">
-                    {{ debugResult.errorMessage || '调试失败，请检查请求配置' }}
-                  </div>
-                  <div v-if="debugSummary" class="api-response-summary">
-                    <div>
-                      <span>HTTP 状态</span>
-                      <b>{{ debugSummary.status ?? '-' }}</b>
-                    </div>
-                    <div>
-                      <span>耗时</span>
-                      <b>{{ debugSummary.durationMs ?? '-' }} ms</b>
-                    </div>
-                  </div>
-                  <div class="api-response-body-head">
-                    <b>响应体</b>
-                    <span>{{ debugResult?.result?.body ? '已格式化' : '等待调试' }}</span>
-                  </div>
-                  <pre>{{ debugBodyText }}</pre>
-                </aside>
-              </div>
+              </section>
             </div>
-          </section>
+          </div>
         </template>
-      </main>
-    </div>
-  </template>
-  <template v-else>
-  <a-layout class="console-layout">
-    <a-layout-sider width="260" class="console-sider">
-      <div class="brand"><span class="brand-mark">B</span><span>Bear MCP<small>管理控制台</small></span></div>
-      <a-menu theme="dark" mode="inline" :selected-keys="[page]" class="console-menu" @click="({key}) => changePage(key)">
-        <div class="nav-caption">概览</div>
-        <a-menu-item key="dashboard"><AppstoreOutlined /><span>概览</span></a-menu-item>
-        <div class="nav-caption">系统治理</div>
-        <a-menu-item key="users"><TeamOutlined /><span>用户</span></a-menu-item>
-        <a-menu-item key="roles"><SafetyCertificateOutlined /><span>角色与能力权限</span></a-menu-item>
-        <div class="nav-caption">访问控制</div>
-        <a-menu-item key="tokens"><KeyOutlined /><span>Token 与能力选择</span></a-menu-item>
-        <div class="nav-caption">能力展示</div>
-        <a-menu-item key="requests"><SettingOutlined /><span>请求配置</span></a-menu-item>
-        <a-menu-item key="dataSources"><DatabaseOutlined /><span>数据源</span></a-menu-item>
-        <a-menu-item key="resources"><DatabaseOutlined /><span>资源</span></a-menu-item>
-        <a-menu-item key="tools"><ThunderboltOutlined /><span>动态工具</span></a-menu-item>
-        <div class="nav-caption">运行观测</div>
-        <a-menu-item key="audits"><AuditOutlined /><span>审计日志</span></a-menu-item>
-      </a-menu>
-      <div class="sider-footer"><span class="live-dot"></span><span>MCP Server Online</span><small>v0.1.0 · Admin Console</small></div>
-    </a-layout-sider>
-    <a-layout-content class="layout-content">
-      <header class="console-topbar"><div class="top-search"><SearchOutlined /><span>搜索页面、工具或配置</span><kbd>⌘ K</kbd></div><div class="top-actions"><a-button @click="changePage('shareHome')">Bear 社区</a-button><a-button @click="changePage('studioHome')">创作空间</a-button><a-button type="text" shape="circle" :icon="h(BellOutlined)" /><div class="user-chip"><span class="avatar">D</span><span><b>demo-admin</b><small>管理员</small></span></div></div></header>
-      <div class="page-head"><div><div class="breadcrumb">MCP 管理后台 <span>/</span> {{ navSections[page] }}</div><h1 class="page-title">{{ title }}</h1><div class="page-desc">{{ desc }}</div></div><a-button v-if="['users','roles','tokens','requests','dataSources'].includes(page)" type="primary" class="create-btn" :icon="h(PlusOutlined)" @click="openCreate">新建{{ title.replace('与工具权限','').replace('与工具选择','').replace('与能力权限','').replace('与能力选择','') }}</a-button></div>
-      <template v-if="page === 'dashboard'">
-        <a-row :gutter="16" class="metric-grid"><a-col v-for="[label,key,icon,color,note] in [['用户', 'users', TeamOutlined, 'violet', '当前数据库统计'],['角色','roles',SafetyCertificateOutlined, 'cyan', '当前数据库统计'],['有效 Token','activeTokens',KeyOutlined, 'orange', '当前数据库统计'],['启用请求','enabledRequests',DatabaseOutlined, 'green', '当前数据库统计'],['动态工具','enabledDynamicTools',ThunderboltOutlined, 'pink', '当前数据库统计'],['今日调用','todayCalls',AuditOutlined, 'cyan', '今日审计统计']]" :key="key" :span="4"><a-card class="metric"><div class="metric-top"><span>{{ label }}</span><span :class="['metric-icon', color]"><component :is="icon" /></span></div><a-statistic :value="dashboard[key] || 0" /><div class="metric-note"><span class="trend">●</span> {{ note }}</div></a-card></a-col></a-row>
-        <div class="surface dashboard-table"><div class="table-toolbar"><div><b>最近调用</b><small>最新 100 条 MCP 能力调用记录</small></div><a-button @click="load">刷新数据</a-button></div><a-table :data-source="rows" :columns="[{title:'时间',dataIndex:'createTime'},{title:'类型',dataIndex:'capabilityType',customRender:({text})=>capabilityTypeLabel(text)},{title:'名称/标识',dataIndex:'capabilityName',customRender:({text})=>compactText(text,42)},{title:'动作',dataIndex:'capabilityAction',customRender:({text})=>capabilityActionLabel(text)},{title:'用户',dataIndex:'userName'},{title:'状态',dataIndex:'status'},{title:'耗时(ms)',dataIndex:'durationMs'}]" row-key="id" :pagination="false" /></div>
-      </template>
-      <template v-else-if="page === 'studioApis'">
-        <div class="studio-hero">
-          <div>
-            <span>API Workspace</span>
-            <h2>先把外部 HTTP API 接进来</h2>
-            <p>这里负责 API 录入、参数模板、在线调试和发布。动态工具包装放到下一步，页面边界先立住。</p>
-          </div>
-          <div class="studio-flow">
-            <b>保存配置</b>
-            <i></i>
-            <b>调试 HTTP</b>
-            <i></i>
-            <b>发布能力</b>
-          </div>
-        </div>
 
-        <div class="studio-api-grid">
-          <article v-for="item in rows" :key="item.id" class="studio-api-card">
-            <div class="studio-api-card-head">
+        <!-- ----------------------------------------------------- Tool editor -->
+        <template v-else-if="page === 'studioToolEdit'">
+          <div class="editor">
+            <header class="editor-head">
+              <div class="editor-head-main">
+                <button class="btn btn-ghost btn-sm" @click="changePage('studioTools')"><Icon name="arrow-left" :size="14" /> 返回</button>
+                <div>
+                  <div class="page-kicker">Tool Studio</div>
+                  <h2 class="page-title" style="font-size: 19px">{{ model.toolName || '未命名 Tool' }}</h2>
+                </div>
+              </div>
+              <div class="editor-actions">
+                <span :class="['badge', publishClass(model.publishStatus)]">{{ publishLabel(model.publishStatus) }}</span>
+                <button class="btn btn-outline btn-sm" :disabled="toolDebugLoading" @click="sendToolEditor">
+                  <Icon name="play" :size="13" /> 调试
+                </button>
+                <button class="btn btn-primary btn-sm" :disabled="toolSaving" @click="saveToolEditor">
+                  <Icon name="save" :size="13" /> {{ toolSaving ? '保存中…' : '保存' }}
+                </button>
+              </div>
+            </header>
+
+            <div class="editor-board">
+              <section class="panel">
+                <div class="panel-head">基础信息</div>
+                <div class="panel-body">
+                  <div class="field"><span class="field-label">工具名</span><input v-model="model.toolName" class="input" placeholder="demo_user_lookup" /><span class="field-hint">MCP 调用名，建议 snake_case</span></div>
+                  <div class="field"><span class="field-label">描述</span><textarea v-model="model.toolDescription" class="textarea" rows="4" placeholder="给模型看的用途说明"></textarea></div>
+                  <div class="field">
+                    <span class="field-label">发布状态</span>
+                    <select v-model.number="model.publishStatus" class="select">
+                      <option v-for="opt in publishStatusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                  </div>
+                  <div class="divider"></div>
+                  <div class="field">
+                    <span class="field-label">关联 API</span>
+                    <div class="check-grid">
+                      <label v-for="api in toolApiOptions" :key="api.value" class="check-item">
+                        <input v-model="selectedToolRequestKeys" type="checkbox" :value="api.value" />
+                        <span>{{ api.label }}</span>
+                      </label>
+                      <div v-if="!toolApiOptions.length" class="hint">还没有已上线的 API</div>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <span class="field-label">关联数据源</span>
+                    <div class="check-grid">
+                      <label v-for="ds in toolDataSourceOptions" :key="ds.value" class="check-item">
+                        <input v-model="selectedToolDataSourceIds" type="checkbox" :value="ds.value" />
+                        <span>{{ ds.label }}</span>
+                      </label>
+                      <div v-if="!toolDataSourceOptions.length" class="hint">没有可用数据源</div>
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head">
+                  <b>Groovy 脚本</b>
+                  <div style="display: flex; gap: 6px">
+                    <button class="btn btn-ghost btn-sm" @click="generateToolScriptFromSelection">由 API 生成</button>
+                    <button class="btn btn-ghost btn-sm" @click="generateToolScriptFromDataSourceSelection">由数据源生成</button>
+                    <button class="btn btn-ghost btn-sm" @click="model.groovyScript = defaultToolScript()">重置</button>
+                  </div>
+                </div>
+                <div class="panel-body">
+                  <textarea v-model="model.groovyScript" class="textarea code-input" rows="18" spellcheck="false"></textarea>
+                  <div class="field" style="margin-top: 12px">
+                    <span class="field-label">inputSchema (JSON Schema)</span>
+                    <textarea v-model="model.inputSchema" class="textarea code-input" rows="10" spellcheck="false"></textarea>
+                    <button class="btn btn-outline btn-sm" style="margin-top: 8px" @click="generateToolSchemaFromScript">从脚本推断 schema</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head"><b>调试</b></div>
+                <div class="panel-body">
+                  <div class="field">
+                    <span class="field-label">参数 (JSON)</span>
+                    <textarea v-model="toolDebugParams" class="textarea code-input" rows="8" spellcheck="false"></textarea>
+                  </div>
+                  <button class="btn btn-outline btn-sm btn-block" :disabled="toolDebugLoading" @click="generateToolDebugParamsFromSelection">根据关联能力生成参数</button>
+                  <div class="section">
+                    <div class="section-head"><div class="section-title">结果</div></div>
+                    <pre class="code tall">{{ toolDebugText }}</pre>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </template>
+        <!-- ---------------------------------------------------- Skill editor -->
+        <template v-else-if="page === 'studioSkillEdit'">
+          <div class="editor">
+            <header class="editor-head">
+              <div class="editor-head-main">
+                <button class="btn btn-ghost btn-sm" @click="changePage('studioSkills')"><Icon name="arrow-left" :size="14" /> 返回</button>
+                <div>
+                  <div class="page-kicker">Skill Studio</div>
+                  <h2 class="page-title" style="font-size: 19px">{{ model.name || '未命名 Skill' }}</h2>
+                </div>
+              </div>
+              <div class="editor-actions">
+                <span :class="['badge', publishClass(model.publishStatus)]">{{ publishLabel(model.publishStatus) }}</span>
+                <button class="btn btn-outline btn-sm" @click="openCursorSkillInstall(model)">安装到 Cursor</button>
+                <button class="btn btn-outline btn-sm" @click="copyCodexSkillInstall(model)">安装到 Codex</button>
+                <button class="btn btn-primary btn-sm" :disabled="skillSaving" @click="saveSkillEditor">
+                  <Icon name="save" :size="13" /> {{ skillSaving ? '保存中…' : '保存' }}
+                </button>
+              </div>
+            </header>
+
+            <div class="editor-board two">
+              <section class="panel">
+                <div class="panel-head">基础信息</div>
+                <div class="panel-body">
+                  <div class="field"><span class="field-label">Skill 名称</span><input v-model="model.name" class="input" placeholder="log-triage" /></div>
+                  <div class="field"><span class="field-label">编码</span><input v-model="model.skillCode" class="input" placeholder="SKILL0000000005" /><span class="field-hint">留空自动生成，格式 SKILL + 10 位数字</span></div>
+                  <div class="field"><span class="field-label">分类</span><input v-model="model.category" class="input" placeholder="运维" /></div>
+                  <div class="field"><span class="field-label">描述</span><textarea v-model="model.description" class="textarea" rows="4" placeholder="这个 Skill 解决什么问题"></textarea></div>
+                  <div class="field">
+                    <span class="field-label">发布状态</span>
+                    <select v-model.number="model.publishStatus" class="select">
+                      <option v-for="opt in publishStatusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                  </div>
+                  <div class="divider"></div>
+                  <div class="field">
+                    <span class="field-label">SKILL.md 文件</span>
+                    <input class="input" type="file" accept=".md,text/markdown" @change="onSkillFileChange" />
+                    <span class="field-hint">{{ skillSelectedFile ? '已选择：' + skillSelectedFile.name : (model.fileName ? '当前文件：' + model.fileName : '支持 frontmatter + 正文，保存时自动上传') }}</span>
+                  </div>
+                  <button class="btn btn-outline btn-sm" :disabled="!model.id" @click="loadSkillPreview">重新加载预览</button>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head"><b>预览</b><span class="tiny muted">{{ model.fileSize || 0 }} B</span></div>
+                <div class="panel-body">
+                  <div v-if="skillPreviewLoading" class="hint">加载中…</div>
+                  <div v-else-if="skillPreviewHtml" class="md" v-html="skillPreviewHtml"></div>
+                  <pre v-else-if="skillPreviewText" class="code tall">{{ skillPreviewText }}</pre>
+                  <div v-else class="empty">
+                    <span class="empty-icon"><Icon name="book" :size="18" /></span>
+                    <div class="empty-title">还没有内容</div>
+                    <div class="empty-desc">上传 SKILL.md 或先保存一次，即可在这里预览渲染效果。</div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </template>
+
+        <!-- --------------------------------------------------- Prompt editor -->
+        <template v-else-if="page === 'studioPromptEdit'">
+          <div class="editor">
+            <header class="editor-head">
+              <div class="editor-head-main">
+                <button class="btn btn-ghost btn-sm" @click="changePage('studioPrompts')"><Icon name="arrow-left" :size="14" /> 返回</button>
+                <div>
+                  <div class="page-kicker">Prompt Studio</div>
+                  <h2 class="page-title" style="font-size: 19px">{{ model.title || model.promptName || '未命名 Prompt' }}</h2>
+                </div>
+              </div>
+              <div class="editor-actions">
+                <span :class="['badge', publishClass(model.publishStatus)]">{{ publishLabel(model.publishStatus) }}</span>
+                <button class="btn btn-outline btn-sm" :disabled="promptPreviewLoading" @click="previewPromptEditor">
+                  <Icon name="play" :size="13" /> 预览
+                </button>
+                <button class="btn btn-primary btn-sm" :disabled="promptSaving" @click="savePromptEditor">
+                  <Icon name="save" :size="13" /> {{ promptSaving ? '保存中…' : '保存' }}
+                </button>
+              </div>
+            </header>
+
+            <div class="editor-board">
+              <section class="panel">
+                <div class="panel-head">基础信息</div>
+                <div class="panel-body">
+                  <div class="field"><span class="field-label">Prompt 名称</span><input v-model="model.promptName" class="input" placeholder="demo_text_to_sql_system" /></div>
+                  <div class="field"><span class="field-label">标题</span><input v-model="model.title" class="input" placeholder="示例：生成 SQL" /></div>
+                  <div class="field"><span class="field-label">描述</span><textarea v-model="model.description" class="textarea" rows="3"></textarea></div>
+                  <div class="field">
+                    <span class="field-label">发布状态</span>
+                    <select v-model.number="model.publishStatus" class="select">
+                      <option v-for="opt in publishStatusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                  </div>
+                  <div class="divider"></div>
+                  <div class="field">
+                    <span class="field-label">参数</span>
+                    <div v-for="(item, index) in promptArgumentItems" :key="item._key" class="field-row" style="align-items: flex-end; margin-bottom: 8px">
+                      <div class="field" style="flex: 1.4">
+                        <input class="input" :value="item.name" placeholder="参数名" @input="updatePromptArgument(index, 'name', $event.target.value)" />
+                      </div>
+                      <div class="field" style="flex: 1.6">
+                        <input class="input" :value="item.description" placeholder="说明" @input="updatePromptArgument(index, 'description', $event.target.value)" />
+                      </div>
+                      <div class="field" style="flex: 1">
+                        <input class="input" :value="item.defaultValue" placeholder="默认值" @input="updatePromptArgument(index, 'defaultValue', $event.target.value)" />
+                      </div>
+                      <label class="check-item" style="flex: none">
+                        <input :checked="item.required" type="checkbox" @change="updatePromptArgument(index, 'required', $event.target.checked)" />
+                        <span class="small">必填</span>
+                      </label>
+                      <button class="btn btn-ghost btn-icon" @click="removePromptArgument(index)"><Icon name="trash" :size="14" /></button>
+                    </div>
+                    <button class="btn btn-outline btn-sm" @click="addPromptArgument"><Icon name="plus" :size="13" /> 添加参数</button>
+                  </div>
+                  <div class="divider"></div>
+                  <div class="field">
+                    <span class="field-label">工具白名单</span>
+                    <div class="check-grid">
+                      <label v-for="tool in promptToolOptions" :key="tool.value" class="check-item">
+                        <input v-model="selectedPromptToolNames" type="checkbox" :value="tool.value" />
+                        <span>{{ tool.label }}</span>
+                      </label>
+                      <div v-if="!promptToolOptions.length" class="hint">没有可选工具</div>
+                    </div>
+                    <button class="btn btn-outline btn-sm" style="margin-top: 8px" @click="insertPromptToolsPlaceholder">插入 tools 占位块</button>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head"><b>模板正文</b></div>
+                <div class="panel-body">
+                  <textarea v-model="model.templateContent" class="textarea code-input" rows="22" spellcheck="false"></textarea>
+                  <div class="section">
+                    <div class="section-head"><div class="section-title">预览参数 (JSON)</div></div>
+                    <textarea v-model="promptPreviewArgs" class="textarea code-input" rows="5" spellcheck="false"></textarea>
+                  </div>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head"><b>渲染结果</b></div>
+                <div class="panel-body">
+                  <div v-if="promptPreviewLoading" class="hint">渲染中…</div>
+                  <pre v-else class="code tall">{{ promptPreviewResult || '点击「预览」生成渲染结果' }}</pre>
+                </div>
+              </section>
+            </div>
+          </div>
+        </template>
+
+        <!-- ------------------------------------------------- Resource editor -->
+        <template v-else-if="page === 'studioResourceEdit'">
+          <div class="editor">
+            <header class="editor-head">
+              <div class="editor-head-main">
+                <button class="btn btn-ghost btn-sm" @click="changePage('studioResources')"><Icon name="arrow-left" :size="14" /> 返回</button>
+                <div>
+                  <div class="page-kicker">Resource Studio</div>
+                  <h2 class="page-title" style="font-size: 19px">{{ model.name || '未命名 Resource' }}</h2>
+                </div>
+              </div>
+              <div class="editor-actions">
+                <span :class="['badge', publishClass(model.publishStatus)]">{{ publishLabel(model.publishStatus) }}</span>
+                <span class="badge badge-outline">{{ visibilityLabel(model.publishStatus) }}</span>
+                <button class="btn btn-primary btn-sm" :disabled="resourceSaving" @click="saveResourceEditor">
+                  <Icon name="save" :size="13" /> {{ resourceSaving ? '保存中…' : '保存' }}
+                </button>
+              </div>
+            </header>
+
+            <div class="editor-board two">
+              <section class="panel">
+                <div class="panel-head">基础信息</div>
+                <div class="panel-body">
+                  <div class="field"><span class="field-label">Resource URI</span><input v-model="model.resourceUri" class="input" placeholder="bear://xxx/text-to-sql/schema/student" /></div>
+                  <div class="field"><span class="field-label">名称</span><input v-model="model.name" class="input" placeholder="student 表结构" /></div>
+                  <div class="field"><span class="field-label">描述</span><textarea v-model="model.description" class="textarea" rows="3"></textarea></div>
+                  <div class="field-row">
+                    <div class="field"><span class="field-label">MIME</span><input v-model="model.mimeType" class="input" placeholder="text/markdown" /></div>
+                    <div class="field">
+                      <span class="field-label">发布状态</span>
+                      <select v-model.number="model.publishStatus" class="select">
+                        <option v-for="opt in publishStatusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                      </select>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <span class="field-label">内容文件</span>
+                    <input class="input" type="file" accept=".md,.txt,.json,text/markdown" @change="onResourceFileChange" />
+                    <span class="field-hint">{{ resourceSelectedFile ? '已选择：' + resourceSelectedFile.name : (model.fileName ? '当前文件：' + model.fileName : '保存时自动上传') }}</span>
+                  </div>
+                  <button class="btn btn-outline btn-sm" :disabled="!model.id" @click="loadResourcePreview">重新加载预览</button>
+                </div>
+              </section>
+
+              <section class="panel">
+                <div class="panel-head"><b>预览</b><span class="tiny muted">{{ model.fileSize || 0 }} B</span></div>
+                <div class="panel-body">
+                  <div v-if="resourcePreviewLoading" class="hint">加载中…</div>
+                  <div v-else-if="resourcePreviewHtml" class="md" v-html="resourcePreviewHtml"></div>
+                  <pre v-else-if="resourcePreviewText" class="code tall">{{ resourcePreviewText }}</pre>
+                  <div v-else class="empty">
+                    <span class="empty-icon"><Icon name="layers" :size="18" /></span>
+                    <div class="empty-title">还没有内容</div>
+                    <div class="empty-desc">上传内容文件或先保存一次，即可预览。</div>
+                  </div>
+                </div>
+              </section>
+            </div>
+          </div>
+        </template>
+
+        <!-- ------------------------------------------------ create/edit sheet -->
+        <div v-if="drawer" class="sheet-mask" @click.self="drawer = false">
+          <div :class="['sheet', ['requests','dataSources'].includes(page) ? 'lg' : '']">
+            <header class="sheet-head">
               <div>
-                <span class="api-method">{{ item.method || 'GET' }}</span>
-                <h3>{{ item.name || item.configKey }}</h3>
+                <div class="sheet-title">{{ drawerTitle }}</div>
+                <div class="sheet-desc">{{ page === 'shareTokens' ? '生成后请立即保存明文 Token' : '带 * 的字段建议填写完整以便他人复用' }}</div>
               </div>
-              <div class="studio-api-badges">
-                <em :class="['publish-badge', publishClass(item.publishStatus)]">{{ publishLabel(item.publishStatus) }}</em>
-                <em v-if="Number(item.publishStatus) !== 0" :class="['publish-badge', visibilityClass(item.publishStatus)]">{{ visibilityLabel(item.publishStatus) }}</em>
+              <button class="btn btn-ghost btn-icon" @click="drawer = false"><Icon name="x" /></button>
+            </header>
+
+            <div class="sheet-body">
+              <div class="form-grid">
+                <!-- tokens / shareTokens -->
+                <template v-if="page === 'tokens' || page === 'shareTokens'">
+                  <label v-if="page === 'tokens'" class="field span-all">
+                    <span class="field-label">所属用户</span>
+                    <select v-model="model.userId" class="select">
+                      <option v-for="opt in userOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                  </label>
+                  <label class="field span-all"><span class="field-label">Token 名称</span><input v-model="model.tokenName" class="input" placeholder="cursor-local" /></label>
+                  <div class="field span-all">
+                    <span class="field-label">权限</span>
+                    <div class="segmented">
+                      <button v-for="opt in tokenPermissionOptions" :key="opt.label" :class="{ active: JSON.stringify(model.permissions) === JSON.stringify(opt.value) }" @click="model.permissions = opt.value">{{ opt.label }}</button>
+                    </div>
+                  </div>
+                  <div class="field">
+                    <span class="field-label">状态</span>
+                    <div class="segmented">
+                      <button v-for="opt in activeStatusOptions" :key="opt.value" :class="{ active: model.isActive === opt.value }" @click="model.isActive = opt.value">{{ opt.label }}</button>
+                    </div>
+                  </div>
+                  <label class="field"><span class="field-label">过期时间</span><input v-model="model.expireTime" class="input" placeholder="不填则不过期" /></label>
+                </template>
+
+                <!-- users -->
+                <template v-else-if="page === 'users'">
+                  <label class="field"><span class="field-label">用户名</span><input v-model="model.username" class="input" placeholder="dev-user" /></label>
+                  <label class="field"><span class="field-label">展示名</span><input v-model="model.displayName" class="input" placeholder="研发用户" /></label>
+                  <label v-if="!model.id" class="field span-all">
+                    <span class="field-label">初始密码</span>
+                    <input v-model="model.password" class="input" placeholder="不填则使用系统默认密码（ChangeMe123），登录后请立即修改" />
+                  </label>
+                  <div class="field span-all">
+                    <span class="field-label">启用状态</span>
+                    <div class="segmented">
+                      <button v-for="opt in activeStatusOptions" :key="opt.value" :class="{ active: model.isEnabled === opt.value }" @click="model.isEnabled = opt.value">{{ opt.label }}</button>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- roles -->
+                <template v-else-if="page === 'roles'">
+                  <label class="field"><span class="field-label">角色编码</span><input v-model="model.roleCode" class="input" placeholder="DEVELOPER" /></label>
+                  <label class="field"><span class="field-label">角色名称</span><input v-model="model.roleName" class="input" placeholder="开发者" /></label>
+                  <label class="field span-all"><span class="field-label">描述</span><textarea v-model="model.description" class="textarea" rows="3"></textarea></label>
+                  <div class="field span-all">
+                    <span class="field-label">启用状态</span>
+                    <div class="segmented">
+                      <button v-for="opt in activeStatusOptions" :key="opt.value" :class="{ active: model.isEnabled === opt.value }" @click="model.isEnabled = opt.value">{{ opt.label }}</button>
+                    </div>
+                  </div>
+                </template>
+
+                <!-- requests -->
+                <template v-else-if="page === 'requests'">
+                  <label class="field"><span class="field-label">配置键</span><input v-model="model.configKey" class="input" placeholder="demo_user_detail" /></label>
+                  <label class="field"><span class="field-label">名称</span><input v-model="model.name" class="input" placeholder="查询用户详情" /></label>
+                  <label class="field span-all"><span class="field-label">URL</span><input v-model="model.url" class="input" placeholder="http://localhost:8080/api/demo/users/{userId}" /></label>
+                  <label class="field"><span class="field-label">方法</span>
+                    <select v-model="model.method" class="select">
+                      <option v-for="opt in httpMethodOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                  </label>
+                  <label class="field"><span class="field-label">类型</span>
+                    <select v-model="model.type" class="select">
+                      <option v-for="opt in requestTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                  </label>
+                  <label class="field"><span class="field-label">服务名</span><input v-model="model.serviceName" class="input" placeholder="demo-service" /></label>
+                  <label class="field"><span class="field-label">方法名</span><input v-model="model.methodName" class="input" placeholder="getUserDetail" /></label>
+                  <label class="field span-all"><span class="field-label">默认参数 paramsDefault</span><textarea v-model="model.paramsDefault" class="textarea code-input" rows="4"></textarea></label>
+                  <label class="field span-all"><span class="field-label">请求头 headers</span><textarea v-model="model.headers" class="textarea code-input" rows="3"></textarea></label>
+                  <label class="field span-all"><span class="field-label">Body 模板</span><textarea v-model="model.bodyTemplate" class="textarea code-input" rows="4"></textarea></label>
+                  <label class="field span-all"><span class="field-label">参数 schema</span><textarea v-model="model.argsSchema" class="textarea code-input" rows="3"></textarea></label>
+                  <label class="field"><span class="field-label">分类</span><input v-model="model.category" class="input" placeholder="演示" /></label>
+                  <label class="field"><span class="field-label">限流(次/分)</span><input v-model.number="model.rateLimitPerMinute" class="input" type="number" /></label>
+                  <label class="field span-all"><span class="field-label">描述</span><textarea v-model="model.description" class="textarea" rows="2"></textarea></label>
+                </template>
+
+                <!-- data sources -->
+                <template v-else-if="page === 'dataSources'">
+                  <label class="field"><span class="field-label">数据源名称</span><input v-model="model.name" class="input" placeholder="演示库" /></label>
+                  <label class="field"><span class="field-label">数据源键</span><input v-model="model.datasourceKey" class="input" :disabled="!!model.id" placeholder="demo_db" /></label>
+                  <label class="field span-all"><span class="field-label">JDBC URL</span><input v-model="model.jdbcUrl" class="input" /></label>
+                  <label class="field"><span class="field-label">类型</span>
+                    <select v-model="model.dbType" class="select">
+                      <option v-for="opt in dataSourceDbTypeOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                  </label>
+                  <label class="field"><span class="field-label">发布状态</span>
+                    <select v-model.number="model.publishStatus" class="select">
+                      <option v-for="opt in dataSourcePublishStatusOptions" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
+                    </select>
+                  </label>
+                  <label class="field"><span class="field-label">用户名</span><input v-model="model.username" class="input" /></label>
+                  <label class="field"><span class="field-label">密码</span><input v-model="model.password" class="input" type="password" :placeholder="model.id ? '留空表示不修改' : '数据库密码'" /></label>
+                  <label class="field span-all"><span class="field-label">额外连接参数</span><textarea v-model="model.extraJdbcProps" class="textarea code-input" rows="3" placeholder='{"useSSL":"false"}'></textarea></label>
+                  <label class="field span-all"><span class="field-label">描述</span><textarea v-model="model.description" class="textarea" rows="2"></textarea></label>
+                </template>
+
+                <!-- fallback -->
+                <template v-else>
+                  <label v-for="(value, key) in model" v-show="!['id','tokenHash','tokenPrefix','createTime','updateTime','lastUsedTime','lastUsedIp'].includes(key)" :key="key" class="field span-all">
+                    <span class="field-label">{{ key }}</span>
+                    <textarea
+                      v-if="['headers','bodyTemplate','paramsDefault','inputSchema','groovyScript','linkedRequestKeys','linkedDataSourceIds','description','argsSchema'].includes(key)"
+                      v-model="model[key]"
+                      class="textarea code-input"
+                      rows="3"
+                    ></textarea>
+                    <input v-else v-model="model[key]" class="input" />
+                  </label>
+                </template>
               </div>
             </div>
-            <p>{{ item.description || '暂无 API 描述' }}</p>
-            <div class="api-meta">
-              <span>{{ item.configKey }}</span>
-              <span>{{ item.category || '未分类' }}</span>
-              <span>{{ Number(item.isEnabled) === 1 ? '启用' : '禁用' }}</span>
+
+            <footer class="sheet-foot">
+              <button v-if="page === 'dataSources'" class="btn btn-outline btn-sm" :disabled="dataSourceTesting" style="margin-right: auto" @click="testDataSourceConnection">
+                {{ dataSourceTesting ? '测试中…' : '测试连接' }}
+              </button>
+              <button class="btn btn-outline" @click="drawer = false">取消</button>
+              <button class="btn btn-primary" @click="save"><Icon name="save" :size="13" /> 保存</button>
+            </footer>
+          </div>
+        </div>
+        <!-- ---------------------------------------------------------- sheets -->
+        <div v-if="oneTimeTokenOpen" class="sheet-mask" @click.self="closeOneTimeTokenModal">
+          <div class="sheet">
+            <header class="sheet-head">
+              <div>
+                <div class="sheet-title">Token 已创建</div>
+                <div class="sheet-desc">「{{ oneTimeTokenName }}」的明文只显示这一次，请立即保存</div>
+              </div>
+              <button class="btn btn-ghost btn-icon" @click="closeOneTimeTokenModal"><Icon name="x" /></button>
+            </header>
+            <div class="sheet-body">
+              <pre class="code" style="white-space: pre-wrap; word-break: break-all">{{ rawToken }}</pre>
+              <p class="hint">丢失后只能重新生成，服务端只保存哈希。</p>
             </div>
-            <code>{{ item.url }}</code>
-            <div class="studio-api-actions">
-              <a-button @click="edit(item)">编辑</a-button>
-              <a-button @click="openApiDebug(item)">调试</a-button>
-              <a-button :type="Number(item.publishStatus) === 0 ? 'primary' : 'default'" :danger="Number(item.publishStatus) !== 0" @click="toggleOnlineApi(item)">{{ onlineActionLabel(item.publishStatus) }}</a-button>
-              <a-button :disabled="Number(item.publishStatus) === 0" @click="toggleVisibilityApi(item)">{{ visibilityActionLabel(item.publishStatus) }}</a-button>
+            <footer class="sheet-foot">
+              <button class="btn btn-outline" @click="closeOneTimeTokenModal">关闭</button>
+              <button class="btn btn-primary" @click="copyRawToken"><Icon name="copy" :size="13" /> 复制 Token</button>
+            </footer>
+          </div>
+        </div>
+
+        <div v-if="apiDebugOpen" class="sheet-mask" @click.self="apiDebugOpen = false">
+          <div class="sheet lg">
+            <header class="sheet-head">
+              <div>
+                <div class="sheet-title">调试 · {{ activeStudioApi?.name || activeStudioApi?.configKey }}</div>
+                <div class="sheet-desc">{{ activeStudioApi?.method }} {{ activeStudioApi?.url }}</div>
+              </div>
+              <button class="btn btn-ghost btn-icon" @click="apiDebugOpen = false"><Icon name="x" /></button>
+            </header>
+            <div class="sheet-body">
+              <label class="field">
+                <span class="field-label">参数 (JSON)</span>
+                <textarea v-model="debugParams" class="textarea code-input" rows="8" spellcheck="false"></textarea>
+              </label>
+              <div class="request-line">
+                <span class="badge badge-primary">{{ activeStudioApi?.method || 'GET' }}</span>
+                <code class="inline">{{ activeStudioApi?.url }}</code>
+              </div>
+              <div class="section">
+                <div class="section-head">
+                  <div class="section-title">响应</div>
+                  <span :class="['response-state', debugResult && debugResult.success === false ? 'fail' : 'ok']">{{ debugSummary }}</span>
+                </div>
+                <pre class="code tall" :class="{ error: debugResult && debugResult.success === false }">{{ prettyJsonText(debugResult) || '尚未发送请求' }}</pre>
+              </div>
             </div>
-          </article>
-        </div>
-        <a-empty v-if="!loading && !rows.length" description="还没有 API，先新建一个外部 HTTP API" :image-style="{height:'56px'}" />
-      </template>
-      <template v-else><div class="surface"><div class="table-toolbar"><div><b>{{ title }}列表</b><small>共 {{ rows.length }} 条记录<span v-if="page==='tools' || page==='resources'"> · 由创作空间发布</span></small></div><div class="table-tools"><a-input :placeholder="page==='audits' ? '搜索能力名称、类型或用户' : '搜索名称或编码'" class="table-search"><template #prefix><SearchOutlined /></template></a-input><a-button @click="load">刷新</a-button></div></div><a-table :loading="loading" :data-source="rows" :columns="[...dataColumns,{title:'操作',key:'action'}]" row-key="id"><template #bodyCell="{column,record}"><template v-if="column.key==='action'"><a-button v-if="page==='users'" type="link" @click="updateUserRoles(record)">分配角色</a-button><a-button v-if="page==='roles'" type="link" @click="updateRoleTools(record)">配置工具</a-button><a-button v-if="page==='roles'" type="link" @click="updateRolePrompts(record)">配置 Prompt</a-button><a-button v-if="page==='roles'" type="link" @click="updateRoleResources(record)">配置 Resource</a-button><a-button v-if="page==='tokens'" type="link" @click="updateSelections(record)">工具选择</a-button><a-button v-if="page==='tokens'" type="link" @click="updateTokenPromptSelections(record)">Prompt 选择</a-button><a-button v-if="page==='tokens'" type="link" @click="updateTokenResourceSelections(record)">Resource 选择</a-button><a-button v-if="page==='tools'" type="link" @click="showDynamicToolDetail(record)">查看详情</a-button><a-button v-if="page==='resources'" type="link" @click="openResourceEditor(record)">查看资源</a-button><a-button v-if="page==='resources'" type="link" :danger="Number(record.enabled) === 1" @click="toggleResourceEnabled(record)">{{ Number(record.enabled) === 1 ? '禁用' : '启用' }}</a-button><a-button v-if="page==='audits'" type="link" @click="showAuditDetail(record)">查看详情</a-button><a-button v-if="!['tools','resources','audits'].includes(page)" type="link" @click="edit(record)">编辑</a-button><a-button v-if="page==='dataSources'" type="link" danger @click="removeRow(record)">删除</a-button></template></template></a-table></div></template>
-    </a-layout-content>
-  </a-layout>
-  </template>
-  <a-drawer v-model:open="drawer" :title="drawerTitle" :width="['requests','studioApis','dataSources'].includes(page) ? 760 : 600" class="console-drawer">
-    <a-form v-if="page === 'tokens' || page === 'shareTokens'" layout="vertical" class="token-form">
-      <section class="form-section">
-        <div class="form-section-head">
-          <b>归属与名称</b>
-          <span>{{ page === 'shareTokens' ? '这把 Token 会归属当前登录用户' : '这把 Token 属于哪个管理用户' }}</span>
+            <footer class="sheet-foot">
+              <button class="btn btn-outline" @click="apiDebugOpen = false">关闭</button>
+              <button class="btn btn-primary" :disabled="debugLoading" @click="runApiDebug">
+                <Icon name="play" :size="13" /> {{ debugLoading ? '请求中…' : '发送请求' }}
+              </button>
+            </footer>
+          </div>
         </div>
 
-        <a-form-item v-if="page === 'tokens'" label="所属用户">
-          <a-select
-            v-model:value="model.userId"
-            :options="userOptions"
-            placeholder="请选择用户"
-            size="large"
-            show-search
-            option-filter-prop="label"
-            popupClassName="dark-select-dropdown"
-          />
-        </a-form-item>
+        <div v-if="communityDetailOpen" class="sheet-mask" @click.self="communityDetailOpen = false">
+          <div class="sheet xl">
+            <header class="sheet-head">
+              <div>
+                <div class="sheet-title">{{ communityDetailTitle }}</div>
+                <div class="sheet-desc">
+                  <span class="badge badge-outline">{{ activeCommunityItem?.communityKind }}</span>
+                  <span style="margin-left: 8px">{{ activeCommunityItem?.description || '' }}</span>
+                </div>
+              </div>
+              <div style="display: flex; gap: 6px">
+                <button class="btn btn-ghost btn-sm" @click="toggleCommunityLike(activeCommunityItem)">{{ likeLabel(activeCommunityItem) }}</button>
+                <button class="btn btn-ghost btn-icon" @click="communityDetailOpen = false"><Icon name="x" /></button>
+              </div>
+            </header>
+            <div class="sheet-body">
+              <template v-if="activeCommunityItem?.communityKind === 'skill'">
+                <div class="kv-grid">
+                  <div class="kv"><span>编码</span><code class="inline">{{ activeCommunityItem.skillCode || communityCode('SKILL', activeCommunityItem.id) }}</code></div>
+                  <div class="kv"><span>分类</span><span>{{ activeCommunityItem.category || '-' }}</span></div>
+                  <div class="kv"><span>文件</span><span>{{ activeCommunityItem.fileName || '-' }}</span></div>
+                </div>
+                <div class="tag-list" style="margin: 12px 0">
+                  <button class="btn btn-outline btn-sm" @click="openCursorSkillInstall(activeCommunityItem)">安装到 Cursor</button>
+                  <button class="btn btn-outline btn-sm" @click="copyCodexSkillInstall(activeCommunityItem)">安装到 Codex</button>
+                  <button class="btn btn-ghost btn-sm" @click="downloadSkillZip(activeCommunityItem)"><Icon name="download" :size="13" /> 下载 ZIP</button>
+                </div>
+                <pre class="code" style="max-height: 46vh">{{ buildCodexSkillInstallCommand(activeCommunityItem) }}</pre>
+              </template>
 
-        <a-form-item label="Token 名称">
-          <a-input v-model:value="model.tokenName" size="large" placeholder="例如：课堂演示 Token" />
-        </a-form-item>
-      </section>
+              <template v-else-if="activeCommunityItem?.communityKind === 'tool'">
+                <div class="kv-grid">
+                  <div class="kv"><span>工具名</span><code class="inline">{{ communityToolCode(activeCommunityItem) }}</code></div>
+                  <div class="kv"><span>类型</span><span>{{ activeCommunityItem.communityType === 'builtin' ? '内置工具' : '动态工具' }}</span></div>
+                  <div class="kv"><span>能力</span><span>{{ communityToolCountLabel(activeCommunityItem) }}</span></div>
+                </div>
+                <div class="section">
+                  <div class="section-head"><div class="section-title">inputSchema</div></div>
+                  <pre class="code tall">{{ prettyJsonText(parseMaybeJson(activeCommunityItem.inputSchema)) }}</pre>
+                </div>
+              </template>
 
-      <section class="form-section">
-        <div class="form-section-head">
-          <b>访问范围</b>
-          <span>控制这把 Token 可以读取工具列表还是可以调用工具</span>
+              <template v-else-if="activeCommunityItem?.communityKind === 'prompt'">
+                <div class="kv-grid">
+                  <div class="kv"><span>Prompt</span><code class="inline">{{ activeCommunityItem.promptName }}</code></div>
+                  <div class="kv"><span>参数</span><span>{{ parseJsonArray(activeCommunityItem.argumentsSchema).length }} 个</span></div>
+                </div>
+                <div class="section">
+                  <div class="section-head"><div class="section-title">模板</div></div>
+                  <pre class="code tall">{{ activeCommunityItem.templateContent }}</pre>
+                </div>
+              </template>
+
+              <template v-else-if="activeCommunityItem?.communityKind === 'resource'">
+                <div class="kv-grid">
+                  <div class="kv"><span>URI</span><code class="inline">{{ activeCommunityItem.resourceUri }}</code></div>
+                  <div class="kv"><span>MIME</span><span>{{ activeCommunityItem.mimeType || '-' }}</span></div>
+                </div>
+                <div v-if="communityResourceContentLoading" class="hint">加载内容…</div>
+                <div v-else-if="communityResourceContentError" class="hint">{{ communityResourceContentError }}</div>
+                <div v-else class="md" v-html="renderMarkdown(communityResourceContent)"></div>
+              </template>
+
+              <template v-else>
+                <div class="kv-grid">
+                  <div class="kv"><span>配置键</span><code class="inline">{{ activeCommunityItem?.configKey }}</code></div>
+                  <div class="kv"><span>方法</span><span class="badge badge-primary">{{ activeCommunityItem?.method || 'GET' }}</span></div>
+                  <div class="kv"><span>分类</span><span>{{ activeCommunityItem?.category || '-' }}</span></div>
+                </div>
+                <div class="section">
+                  <div class="section-head"><div class="section-title">URL</div></div>
+                  <pre class="code">{{ activeCommunityItem?.url }}</pre>
+                </div>
+              </template>
+            </div>
+            <footer class="sheet-foot">
+              <button class="btn btn-outline" @click="communityDetailOpen = false">关闭</button>
+            </footer>
+          </div>
         </div>
 
-        <a-radio-group v-model:value="model.permissions" class="permission-card-group">
-          <a-radio-button
-            v-for="option in tokenPermissionOptions"
-            :key="option.value"
-            :value="option.value"
-          >
-            {{ option.label }}
-          </a-radio-button>
-        </a-radio-group>
-      </section>
-
-      <section class="form-section compact">
-        <a-form-item label="状态">
-          <a-segmented
-            v-model:value="model.isActive"
-            :options="activeStatusOptions"
-            block
-            class="status-segmented"
-          />
-        </a-form-item>
-
-        <a-form-item label="过期时间">
-          <a-input v-model:value="model.expireTime" size="large" placeholder="不填表示不过期" />
-        </a-form-item>
-      </section>
-    </a-form>
-    <a-form v-else-if="page === 'users'" layout="vertical" class="entity-form">
-      <section class="form-section">
-        <div class="form-section-head">
-          <b>用户信息</b>
-          <span>登录身份和后台展示名称</span>
+        <div v-if="dynamicToolDetailOpen" class="sheet-mask" @click.self="dynamicToolDetailOpen = false">
+          <div class="sheet lg">
+            <header class="sheet-head">
+              <div>
+                <div class="sheet-title">{{ activeDynamicTool?.toolName }}</div>
+                <div class="sheet-desc">{{ activeDynamicTool?.toolDescription || '动态工具详情' }}</div>
+              </div>
+              <button class="btn btn-ghost btn-icon" @click="dynamicToolDetailOpen = false"><Icon name="x" /></button>
+            </header>
+            <div class="sheet-body">
+              <div class="kv-grid three">
+                <div class="kv"><span>关联 API</span><span>{{ linkedRequestLabel(activeDynamicTool?.linkedRequestKeys) }}</span></div>
+                <div class="kv"><span>关联数据源</span><span>{{ linkedDataSourceLabel(activeDynamicTool?.linkedDataSourceIds) }}</span></div>
+                <div class="kv"><span>状态</span><span>{{ publishLabel(activeDynamicTool?.publishStatus) }}</span></div>
+              </div>
+              <div class="section">
+                <div class="section-head"><div class="section-title">inputSchema</div></div>
+                <pre class="code tall">{{ prettyJsonText(parseMaybeJson(activeDynamicTool?.inputSchema)) }}</pre>
+              </div>
+              <div class="section">
+                <div class="section-head"><div class="section-title">Groovy 脚本</div></div>
+                <pre class="code tall">{{ activeDynamicTool?.groovyScript }}</pre>
+              </div>
+            </div>
+            <footer class="sheet-foot">
+              <button class="btn btn-outline" @click="dynamicToolDetailOpen = false">关闭</button>
+            </footer>
+          </div>
         </div>
 
-        <a-form-item label="登录用户名">
-          <a-input v-model:value="model.username" size="large" placeholder="例如：demo-admin" />
-        </a-form-item>
-
-        <a-form-item label="展示名称">
-          <a-input v-model:value="model.displayName" size="large" placeholder="例如：演示管理员" />
-        </a-form-item>
-
-        <a-form-item v-if="!model.id" label="初始密码">
-          <a-input-password v-model:value="model.password" size="large" placeholder="不填则使用系统默认密码（ChangeMe123），登录后请立即修改" />
-          <div class="form-help">编辑用户时当前版本不在这里修改密码。</div>
-        </a-form-item>
-      </section>
-
-      <section class="form-section compact">
-        <a-form-item label="账号状态">
-          <a-segmented
-            v-model:value="model.isEnabled"
-            :options="activeStatusOptions"
-            block
-            class="status-segmented"
-          />
-        </a-form-item>
-      </section>
-    </a-form>
-    <a-form v-else-if="page === 'roles'" layout="vertical" class="entity-form">
-      <section class="form-section">
-        <div class="form-section-head">
-          <b>角色信息</b>
-          <span>角色决定用户可以使用哪些工具的资格上限</span>
+        <div v-if="auditDetailOpen" class="sheet-mask" @click.self="auditDetailOpen = false">
+          <div class="sheet lg">
+            <header class="sheet-head">
+              <div>
+                <div class="sheet-title">调用详情</div>
+                <div class="sheet-desc">{{ activeAuditLog?.createTime }} · {{ activeAuditLog?.userName || '-' }}</div>
+              </div>
+              <button class="btn btn-ghost btn-icon" @click="auditDetailOpen = false"><Icon name="x" /></button>
+            </header>
+            <div class="sheet-body">
+              <div class="kv-grid three">
+                <div class="kv"><span>类型</span><span>{{ capabilityTypeLabel(activeAuditLog?.capabilityType) }}</span></div>
+                <div class="kv"><span>能力</span><span>{{ activeAuditLog?.capabilityName }}</span></div>
+                <div class="kv"><span>动作</span><span>{{ capabilityActionLabel(activeAuditLog?.capabilityAction) }}</span></div>
+                <div class="kv"><span>状态</span><span :class="['badge', String(activeAuditLog?.status).toUpperCase() === 'SUCCESS' ? 'badge-success' : 'badge-danger']">{{ activeAuditLog?.status }}</span></div>
+                <div class="kv"><span>耗时</span><span>{{ activeAuditLog?.durationMs }} ms</span></div>
+              </div>
+              <div class="section">
+                <div class="section-head"><div class="section-title">请求参数</div></div>
+                <pre class="code tall">{{ prettyJsonText(parseMaybeJson(activeAuditLog?.requestParams)) }}</pre>
+              </div>
+              <div class="section">
+                <div class="section-head"><div class="section-title">响应摘要</div></div>
+                <pre class="code tall">{{ activeAuditLog?.responseSummary || '-' }}</pre>
+              </div>
+              <div v-if="activeAuditLog?.errorMessage" class="section">
+                <div class="section-head"><div class="section-title">错误</div></div>
+                <pre class="code error">{{ activeAuditLog.errorMessage }}</pre>
+              </div>
+            </div>
+            <footer class="sheet-foot">
+              <button class="btn btn-outline" @click="auditDetailOpen = false">关闭</button>
+            </footer>
+          </div>
         </div>
 
-        <a-form-item label="角色编码">
-          <a-input v-model:value="model.roleCode" size="large" placeholder="例如：ADMIN" />
-        </a-form-item>
-
-        <a-form-item label="角色名称">
-          <a-input v-model:value="model.roleName" size="large" placeholder="例如：管理员" />
-        </a-form-item>
-
-        <a-form-item label="角色说明">
-          <a-textarea v-model:value="model.description" class="code-area" placeholder="说明这个角色适合哪些用户" :auto-size="{minRows:3,maxRows:5}" />
-        </a-form-item>
-      </section>
-
-      <section class="form-section compact">
-        <a-form-item label="角色状态">
-          <a-segmented
-            v-model:value="model.isEnabled"
-            :options="activeStatusOptions"
-            block
-            class="status-segmented"
-          />
-        </a-form-item>
-      </section>
-    </a-form>
-    <a-form v-else-if="page === 'requests' || page === 'studioApis'" layout="vertical" class="entity-form request-form">
-      <section class="form-section">
-        <div class="form-section-head">
-          <b>基础信息</b>
-          <span>{{ page === 'studioApis' ? '先保存外部 HTTP API，后续可包装成动态工具' : '动态工具通过配置 Key 引用这项能力' }}</span>
+        <div v-if="userRoleOpen" class="sheet-mask" @click.self="userRoleOpen = false">
+          <div class="sheet">
+            <header class="sheet-head">
+              <div>
+                <div class="sheet-title">分配角色 · {{ activeUser?.displayName || activeUser?.username }}</div>
+                <div class="sheet-desc">一个用户可以拥有多个角色，权限取并集</div>
+              </div>
+              <button class="btn btn-ghost btn-icon" @click="userRoleOpen = false"><Icon name="x" /></button>
+            </header>
+            <div class="sheet-body">
+              <div class="check-grid">
+                <label v-for="role in roles" :key="role.id" class="check-item">
+                  <input v-model="selectedUserRoles" type="checkbox" :value="role.id" />
+                  <span><b>{{ role.roleName }}</b><br /><small class="muted">{{ role.roleCode }}</small></span>
+                </label>
+              </div>
+            </div>
+            <footer class="sheet-foot">
+              <button class="btn btn-outline" @click="userRoleOpen = false">取消</button>
+              <button class="btn btn-primary" @click="saveUserRoles">保存</button>
+            </footer>
+          </div>
         </div>
 
-        <a-row :gutter="12">
-          <a-col :span="12">
-            <a-form-item label="接口 ID">
-              <a-input v-model:value="model.requestId" size="large" placeholder="例如：API0000000001" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="配置 Key">
-              <a-input v-model:value="model.configKey" size="large" placeholder="例如：demo_clock" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-
-        <a-form-item label="配置名称">
-          <a-input v-model:value="model.name" size="large" placeholder="例如：查询当前时间" />
-        </a-form-item>
-
-        <a-form-item label="能力说明">
-          <a-textarea v-model:value="model.description" class="code-area" placeholder="说明这项请求配置提供什么企业能力" :auto-size="{minRows:3,maxRows:5}" />
-        </a-form-item>
-      </section>
-
-      <section class="form-section">
-        <div class="form-section-head">
-          <b>调用方式</b>
-          <span>当前支持外部 HTTP API 接入</span>
+        <div v-if="toolPermissionOpen" class="sheet-mask" @click.self="toolPermissionOpen = false">
+          <div class="sheet xl">
+            <header class="sheet-head">
+              <div>
+                <div class="sheet-title">角色工具权限 · {{ activeRole?.roleName }}</div>
+                <div class="sheet-desc">勾选后该角色下的用户即可调用这些工具</div>
+              </div>
+              <button class="btn btn-ghost btn-icon" @click="toolPermissionOpen = false"><Icon name="x" /></button>
+            </header>
+            <div class="sheet-body">
+              <div class="section">
+                <div class="section-head">
+                  <div class="section-title">内置工具</div>
+                  <div style="display: flex; gap: 6px">
+                    <button class="btn btn-ghost btn-sm" @click="selectRoleToolGroup('builtin')">全选</button>
+                    <button class="btn btn-ghost btn-sm" @click="clearRoleToolGroup('builtin')">清空</button>
+                  </div>
+                </div>
+                <div class="check-grid three">
+                  <label v-for="tool in builtinTools" :key="'rb-' + tool.name" class="check-item">
+                    <input v-model="selectedRoleTools" type="checkbox" :value="tool.name" />
+                    <span><b>{{ tool.name }}</b><br /><small class="muted">{{ tool.description }}</small></span>
+                  </label>
+                </div>
+              </div>
+              <div class="section">
+                <div class="section-head">
+                  <div class="section-title">动态工具</div>
+                  <div style="display: flex; gap: 6px">
+                    <button class="btn btn-ghost btn-sm" @click="selectRoleToolGroup('dynamic')">全选</button>
+                    <button class="btn btn-ghost btn-sm" @click="clearRoleToolGroup('dynamic')">清空</button>
+                  </div>
+                </div>
+                <div class="check-grid three">
+                  <label v-for="tool in dynamicToolOptions" :key="'rd-' + tool.toolName" class="check-item">
+                    <input v-model="selectedRoleTools" type="checkbox" :value="tool.toolName" />
+                    <span><b>{{ tool.toolName }}</b><br /><small class="muted">{{ tool.toolDescription || '动态工具' }}</small></span>
+                  </label>
+                  <div v-if="!dynamicToolOptions.length" class="hint">还没有已上线的动态工具</div>
+                </div>
+              </div>
+              <div class="section">
+                <div class="section-head">
+                  <div class="section-title">飞书工具</div>
+                  <div style="display: flex; gap: 6px">
+                    <button class="btn btn-ghost btn-sm" @click="selectRoleToolGroup('feishu')">全选</button>
+                    <button class="btn btn-ghost btn-sm" @click="clearRoleToolGroup('feishu')">清空</button>
+                  </div>
+                </div>
+                <div class="check-grid three">
+                  <label v-for="tool in feishuToolOptions" :key="'rf-' + tool.toolName" class="check-item">
+                    <input v-model="selectedRoleTools" type="checkbox" :value="tool.toolName" />
+                    <span><b>{{ tool.toolName }}</b><br /><small class="muted">{{ tool.toolDescription || '飞书工具' }}</small></span>
+                  </label>
+                  <div v-if="!feishuToolOptions.length" class="hint">未配置飞书集成</div>
+                </div>
+              </div>
+            </div>
+            <footer class="sheet-foot">
+              <button class="btn btn-ghost btn-sm" style="margin-right: auto" @click="clearRoleTools">全部清空</button>
+              <button class="btn btn-outline" @click="toolPermissionOpen = false">取消</button>
+              <button class="btn btn-primary" @click="saveRoleTools">保存</button>
+            </footer>
+          </div>
         </div>
 
-        <a-row :gutter="12">
-          <a-col :span="8">
-            <a-form-item label="协议类型">
-              <a-select v-model:value="model.type" :options="requestTypeOptions" size="large" popupClassName="dark-select-dropdown" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="HTTP 方法">
-              <a-select v-model:value="model.method" :options="httpMethodOptions" size="large" popupClassName="dark-select-dropdown" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="分类">
-              <a-input v-model:value="model.category" size="large" placeholder="例如：demo" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-
-        <a-form-item label="请求 URL">
-          <a-input v-model:value="model.url" size="large" placeholder="外部 HTTP API 请求地址" />
-        </a-form-item>
-
-        <a-row v-if="page === 'requests'" :gutter="12">
-          <a-col :span="12">
-            <a-form-item label="服务名称">
-              <a-input v-model:value="model.serviceName" size="large" placeholder="SOA/Hessian 服务名，可留空" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="方法名称">
-              <a-input v-model:value="model.methodName" size="large" placeholder="SOA/Hessian 方法名，可留空" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-      </section>
-
-      <section class="form-section">
-        <div class="form-section-head">
-          <b>参数与治理</b>
-          <span>JSON 字段用于脚本调试和运行时默认参数</span>
+        <div v-if="promptPermissionOpen" class="sheet-mask" @click.self="promptPermissionOpen = false">
+          <div class="sheet lg">
+            <header class="sheet-head">
+              <div>
+                <div class="sheet-title">角色 Prompt 权限 · {{ activeRole?.roleName }}</div>
+                <div class="sheet-desc">仅勾选项会出现在 Prompt 列表</div>
+              </div>
+              <button class="btn btn-ghost btn-icon" @click="promptPermissionOpen = false"><Icon name="x" /></button>
+            </header>
+            <div class="sheet-body">
+              <div class="check-grid">
+                <label v-for="prompt in promptOptions" :key="prompt.promptName" class="check-item">
+                  <input v-model="selectedRolePrompts" type="checkbox" :value="prompt.promptName" />
+                  <span><b>{{ prompt.title || prompt.promptName }}</b><br /><small class="muted">{{ prompt.promptName }}</small></span>
+                </label>
+                <div v-if="!promptOptions.length" class="hint">还没有可用的 Prompt</div>
+              </div>
+            </div>
+            <footer class="sheet-foot">
+              <button class="btn btn-ghost btn-sm" style="margin-right: auto" @click="clearRolePrompts">全部清空</button>
+              <button class="btn btn-outline" @click="promptPermissionOpen = false">取消</button>
+              <button class="btn btn-primary" @click="saveRolePrompts">保存</button>
+            </footer>
+          </div>
         </div>
 
-        <a-row :gutter="12">
-          <a-col :span="12">
-            <a-form-item label="请求头 JSON">
-              <a-textarea v-model:value="model.headers" class="code-area" :auto-size="{minRows:4,maxRows:8}" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="默认参数 JSON">
-              <a-textarea v-model:value="model.paramsDefault" class="code-area" :auto-size="{minRows:4,maxRows:8}" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-
-        <a-form-item label="请求体模板">
-          <a-textarea v-model:value="model.bodyTemplate" class="code-area" placeholder="POST/PUT 请求体模板，可留空" :auto-size="{minRows:3,maxRows:8}" />
-        </a-form-item>
-
-        <a-form-item v-if="page === 'requests'" label="参数 Schema JSON">
-          <a-textarea v-model:value="model.argsSchema" class="code-area" :auto-size="{minRows:3,maxRows:8}" />
-        </a-form-item>
-
-        <a-row :gutter="12">
-          <a-col :span="8">
-            <a-form-item label="连接超时(ms)">
-              <a-input-number v-model:value="model.connectTimeoutMs" size="large" :min="0" class="full-number" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="读取超时(ms)">
-              <a-input-number v-model:value="model.readTimeoutMs" size="large" :min="0" class="full-number" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="每分钟限流">
-              <a-input-number v-model:value="model.rateLimitPerMinute" size="large" :min="0" class="full-number" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-      </section>
-
-      <section class="form-section compact">
-        <a-row :gutter="12">
-          <a-col v-if="page === 'requests'" :span="12">
-            <a-form-item label="启用状态">
-              <a-segmented v-model:value="model.isEnabled" :options="activeStatusOptions" block class="status-segmented" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="发布状态">
-              <a-segmented v-model:value="model.publishStatus" :options="publishStatusOptions" block class="status-segmented publish-segmented" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-      </section>
-    </a-form>
-    <a-form v-else-if="page === 'dataSources'" layout="vertical" class="entity-form request-form">
-      <section class="form-section">
-        <div class="form-section-head">
-          <b>基础信息</b>
-          <span>数据源发布后可作为 MCP 查询能力和动态 Tool runSql 的配置来源</span>
+        <div v-if="resourcePermissionOpen" class="sheet-mask" @click.self="resourcePermissionOpen = false">
+          <div class="sheet lg">
+            <header class="sheet-head">
+              <div>
+                <div class="sheet-title">角色 Resource 权限 · {{ activeRole?.roleName }}</div>
+                <div class="sheet-desc">按 URI 授权只读资源</div>
+              </div>
+              <button class="btn btn-ghost btn-icon" @click="resourcePermissionOpen = false"><Icon name="x" /></button>
+            </header>
+            <div class="sheet-body">
+              <div class="check-grid">
+                <label v-for="resource in resourceOptions" :key="resource.resourceUri" class="check-item">
+                  <input v-model="selectedRoleResources" type="checkbox" :value="resource.resourceUri" />
+                  <span><b>{{ resource.name }}</b><br /><small class="muted">{{ resource.resourceUri }}</small></span>
+                </label>
+                <div v-if="!resourceOptions.length" class="hint">还没有可用的 Resource</div>
+              </div>
+            </div>
+            <footer class="sheet-foot">
+              <button class="btn btn-ghost btn-sm" style="margin-right: auto" @click="clearRoleResources">全部清空</button>
+              <button class="btn btn-outline" @click="resourcePermissionOpen = false">取消</button>
+              <button class="btn btn-primary" @click="saveRoleResources">保存</button>
+            </footer>
+          </div>
         </div>
 
-        <a-row :gutter="12">
-          <a-col :span="12">
-            <a-form-item label="数据源名称">
-              <a-input v-model:value="model.name" size="large" placeholder="例如：课堂演示库" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="12">
-            <a-form-item label="数据源 Key">
-              <a-input v-model:value="model.datasourceKey" size="large" :disabled="Boolean(model.id)" placeholder="例如：classroom_demo" />
-            </a-form-item>
-          </a-col>
-        </a-row>
-
-        <a-form-item label="数据源说明">
-          <a-textarea v-model:value="model.description" class="code-area" placeholder="说明这个库包含哪些业务数据、适合哪些查询场景" :auto-size="{minRows:3,maxRows:5}" />
-        </a-form-item>
-      </section>
-
-      <section class="form-section">
-        <div class="form-section-head">
-          <b>连接信息</b>
-          <span>密码只会保存为密文，列表和编辑接口不会返回明文</span>
+        <div v-if="tokenSelectionOpen" class="sheet-mask" @click.self="tokenSelectionOpen = false">
+          <div class="sheet xl">
+            <header class="sheet-head">
+              <div>
+                <div class="sheet-title">Token 工具选择 · {{ activeToken?.tokenName }}</div>
+                <div class="sheet-desc">Token 级别白名单，优先于角色权限生效</div>
+              </div>
+              <button class="btn btn-ghost btn-icon" @click="tokenSelectionOpen = false"><Icon name="x" /></button>
+            </header>
+            <div class="sheet-body">
+              <div class="section">
+                <div class="section-head">
+                  <div class="section-title">内置工具</div>
+                  <div style="display: flex; gap: 6px">
+                    <button class="btn btn-ghost btn-sm" @click="selectTokenToolGroup('builtin')">全选</button>
+                    <button class="btn btn-ghost btn-sm" @click="clearTokenToolGroup('builtin')">清空</button>
+                  </div>
+                </div>
+                <div class="check-grid three">
+                  <label v-for="tool in builtinTools" :key="'tb-' + tool.name" class="check-item">
+                    <input v-model="selectedTokenTools" type="checkbox" :value="tool.name" />
+                    <span><b>{{ tool.name }}</b><br /><small class="muted">{{ tool.description }}</small></span>
+                  </label>
+                </div>
+              </div>
+              <div class="section">
+                <div class="section-head">
+                  <div class="section-title">动态工具</div>
+                  <div style="display: flex; gap: 6px">
+                    <button class="btn btn-ghost btn-sm" @click="selectTokenToolGroup('dynamic')">全选</button>
+                    <button class="btn btn-ghost btn-sm" @click="clearTokenToolGroup('dynamic')">清空</button>
+                  </div>
+                </div>
+                <div class="check-grid three">
+                  <label v-for="tool in dynamicToolOptions" :key="'td-' + tool.toolName" class="check-item">
+                    <input v-model="selectedTokenTools" type="checkbox" :value="tool.toolName" />
+                    <span><b>{{ tool.toolName }}</b><br /><small class="muted">{{ tool.toolDescription || '动态工具' }}</small></span>
+                  </label>
+                </div>
+              </div>
+            </div>
+            <footer class="sheet-foot">
+              <button class="btn btn-ghost btn-sm" style="margin-right: auto" @click="clearTokenTools">全部清空</button>
+              <button class="btn btn-outline" @click="tokenSelectionOpen = false">取消</button>
+              <button class="btn btn-primary" @click="saveTokenSelections">保存</button>
+            </footer>
+          </div>
         </div>
 
-        <a-row :gutter="12">
-          <a-col :span="8">
-            <a-form-item label="数据库类型">
-              <a-select v-model:value="model.dbType" :options="dataSourceDbTypeOptions" size="large" popupClassName="dark-select-dropdown" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item label="用户名">
-              <a-input v-model:value="model.username" size="large" placeholder="数据库用户名" />
-            </a-form-item>
-          </a-col>
-          <a-col :span="8">
-            <a-form-item :label="model.id ? '密码（留空不修改）' : '密码'">
-              <a-input-password v-model:value="model.password" size="large" placeholder="数据库密码" />
-            </a-form-item>
-          </a-col>
-        </a-row>
+        <div v-if="tokenPromptSelectionOpen" class="sheet-mask" @click.self="tokenPromptSelectionOpen = false">
+          <div class="sheet lg">
+            <header class="sheet-head">
+              <div>
+                <div class="sheet-title">Token Prompt 选择 · {{ activeToken?.tokenName }}</div>
+                <div class="sheet-desc">勾选该 Token 可使用的 Prompt 模板</div>
+              </div>
+              <button class="btn btn-ghost btn-icon" @click="tokenPromptSelectionOpen = false"><Icon name="x" /></button>
+            </header>
+            <div class="sheet-body">
+              <div class="check-grid">
+                <label v-for="prompt in promptOptions" :key="prompt.promptName" class="check-item">
+                  <input v-model="selectedTokenPrompts" type="checkbox" :value="prompt.promptName" />
+                  <span><b>{{ prompt.title || prompt.promptName }}</b><br /><small class="muted">{{ prompt.promptName }}</small></span>
+                </label>
+              </div>
+            </div>
+            <footer class="sheet-foot">
+              <button class="btn btn-ghost btn-sm" style="margin-right: auto" @click="clearTokenPrompts">全部清空</button>
+              <button class="btn btn-outline" @click="tokenPromptSelectionOpen = false">取消</button>
+              <button class="btn btn-primary" @click="saveTokenPromptSelections">保存</button>
+            </footer>
+          </div>
+        </div>
 
-        <a-form-item label="JDBC URL">
-          <a-input v-model:value="model.jdbcUrl" size="large" placeholder="jdbc:mysql://localhost:3306/demo" />
-        </a-form-item>
-
-        <a-form-item label="额外 JDBC 参数 JSON">
-          <a-textarea v-model:value="model.extraJdbcProps" class="code-area" :auto-size="{minRows:3,maxRows:6}" placeholder='例如：{"useUnicode":"true"}' />
-        </a-form-item>
-      </section>
-
-      <section class="form-section compact">
-        <a-form-item label="发布状态">
-          <a-segmented v-model:value="model.publishStatus" :options="dataSourcePublishStatusOptions" block class="status-segmented publish-segmented" />
-        </a-form-item>
-      </section>
-    </a-form>
-    <a-form v-else layout="vertical" class="entity-form">
-      <template v-for="(value,key) in model" :key="key"><a-form-item v-if="!['id','tokenHash','tokenPrefix','createTime','updateTime','lastUsedTime','lastUsedIp'].includes(key)" :label="key"><a-textarea v-if="['headers','bodyTemplate','paramsDefault','inputSchema','groovyScript','linkedRequestKeys','linkedDataSourceIds','description','argsSchema'].includes(key)" v-model:value="model[key]" class="code-area" :auto-size="{minRows:2,maxRows:8}" /><a-input v-else v-model:value="model[key]" /></a-form-item></template>
-    </a-form>
-    <template #footer><a-space><a-button @click="drawer=false">取消</a-button><a-button v-if="page === 'dataSources'" :loading="dataSourceTesting" @click="testDataSourceConnection">测试连接</a-button><a-button type="primary" @click="save">保存</a-button></a-space></template>
-  </a-drawer>
-  <a-modal
-    v-model:open="oneTimeTokenOpen"
-    title="Token 创建成功"
-    width="720px"
-    class="tool-permission-modal one-time-token-modal"
-    :maskClosable="false"
-    @cancel="closeOneTimeTokenModal"
-  >
-    <section class="tool-option-section">
-      <div class="tool-option-title">
-        <div>
-          <b>{{ oneTimeTokenName }}</b>
-          <small>完整 Token 只展示一次，关闭后无法再次查看</small>
+        <div v-if="tokenResourceSelectionOpen" class="sheet-mask" @click.self="tokenResourceSelectionOpen = false">
+          <div class="sheet lg">
+            <header class="sheet-head">
+              <div>
+                <div class="sheet-title">Token Resource 选择 · {{ activeToken?.tokenName }}</div>
+                <div class="sheet-desc">按 URI 勾选可读取的资源</div>
+              </div>
+              <button class="btn btn-ghost btn-icon" @click="tokenResourceSelectionOpen = false"><Icon name="x" /></button>
+            </header>
+            <div class="sheet-body">
+              <div class="check-grid">
+                <label v-for="resource in resourceOptions" :key="resource.resourceUri" class="check-item">
+                  <input v-model="selectedTokenResources" type="checkbox" :value="resource.resourceUri" />
+                  <span><b>{{ resource.name }}</b><br /><small class="muted">{{ resource.resourceUri }}</small></span>
+                </label>
+              </div>
+            </div>
+            <footer class="sheet-foot">
+              <button class="btn btn-ghost btn-sm" style="margin-right: auto" @click="clearTokenResources">全部清空</button>
+              <button class="btn btn-outline" @click="tokenResourceSelectionOpen = false">取消</button>
+              <button class="btn btn-primary" @click="saveTokenResourceSelections">保存</button>
+            </footer>
+          </div>
         </div>
       </div>
-      <p class="permission-hint detail-desc">请立即复制并保存到 MCP Client 或安全的密钥管理位置。数据库只保存 Token Hash 和展示前缀，后台无法找回完整明文。</p>
-      <pre class="detail-code token-plain-code">{{ rawToken }}</pre>
-    </section>
-    <template #footer>
-      <a-space>
-        <a-button @click="copyRawToken">复制 Token</a-button>
-        <a-button type="primary" @click="closeOneTimeTokenModal">我已保存</a-button>
-      </a-space>
-    </template>
-  </a-modal>
-  <a-modal v-model:open="apiDebugOpen" :title="`调试 API · ${activeStudioApi?.name || ''}`" width="860px" class="tool-permission-modal dynamic-tool-detail-modal">
-    <section class="tool-option-section">
-      <div class="tool-option-title">
-        <span class="tool-type-dot builtin"></span>
-        调试参数
-        <small>JSON 对象，会覆盖默认参数中的同名字段</small>
-      </div>
-      <a-textarea v-model:value="debugParams" class="code-area debug-textarea" :auto-size="{minRows:6,maxRows:12}" />
-      <div class="debug-actions">
-        <a-button type="primary" :loading="debugLoading" @click="runApiDebug">发送请求</a-button>
-      </div>
-    </section>
+    </div>
+  </div>
 
-    <section v-if="debugResult" class="tool-option-section">
-      <div class="tool-option-title">
-        <span :class="['tool-type-dot', debugResult.success ? 'builtin' : 'dynamic']"></span>
-        调试结果
-        <small>{{ debugResult.durationMs != null ? `${debugResult.durationMs} ms` : '' }}</small>
-      </div>
-      <pre class="detail-code script-code">{{ JSON.stringify(debugResult, null, 2) }}</pre>
-    </section>
-
-    <template #footer>
-      <a-button @click="apiDebugOpen=false">关闭</a-button>
-    </template>
-  </a-modal>
-  <a-modal v-model:open="communityDetailOpen" :title="communityDetailTitle" width="760px" class="tool-permission-modal dynamic-tool-detail-modal community-detail-modal">
-    <template v-if="activeCommunityItem?.communityKind === 'skill'">
-      <section class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot builtin"></span>
-          基础信息
-          <small>Bear Skill</small>
-        </div>
-        <div class="detail-grid">
-          <div>
-            <span>Skill ID</span>
-            <b>{{ activeCommunityItem?.skillCode || '-' }}</b>
-          </div>
-          <div>
-            <span>名称</span>
-            <b>{{ activeCommunityItem?.name || '-' }}</b>
-          </div>
-          <div>
-            <span>分类</span>
-            <b>{{ activeCommunityItem?.category || '未分类' }}</b>
-          </div>
-          <div>
-            <span>文件</span>
-            <b>{{ activeCommunityItem?.fileName || 'SKILL.md' }}</b>
-          </div>
-        </div>
-        <p class="permission-hint detail-desc">{{ activeCommunityItem?.description || '暂无 Skill 描述' }}</p>
-      </section>
-
-      <section class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot dynamic"></span>
-          安装方式
-          <small>通过 get_skill 或 bear-skill 安装</small>
-        </div>
-        <pre class="detail-code">get_skill({ "skillCode": "{{ activeCommunityItem?.skillCode || '' }}" })
-{{ buildCodexSkillInstallCommand(activeCommunityItem || {}) }}</pre>
-      </section>
-    </template>
-
-    <template v-else-if="activeCommunityItem?.communityKind === 'tool'">
-      <section class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot dynamic"></span>
-          基础信息
-          <small>{{ activeCommunityItem?.communityType === 'builtin' ? '内置工具' : '动态工具' }}</small>
-        </div>
-        <div class="detail-grid">
-          <div>
-            <span>工具名</span>
-            <b>{{ activeCommunityItem?.displayName || activeCommunityItem?.toolName || '-' }}</b>
-          </div>
-          <div>
-            <span>工具编号</span>
-            <b>{{ communityToolCode(activeCommunityItem || {}) }}</b>
-          </div>
-          <div>
-            <span>分类</span>
-            <b>{{ activeCommunityItem?.displayCategory || activeCommunityItem?.category || '-' }}</b>
-          </div>
-          <div>
-            <span>发布范围</span>
-            <b>公开</b>
-          </div>
-        </div>
-        <p class="permission-hint detail-desc">{{ activeCommunityItem?.displayDescription || activeCommunityItem?.toolDescription || '暂无工具描述' }}</p>
-      </section>
-
-      <section class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot builtin"></span>
-          入参 Schema
-          <small>AI Client 看到的参数结构</small>
-        </div>
-        <pre class="detail-code">{{ prettyJsonText(activeCommunityItem?.inputSchema || '{}') }}</pre>
-      </section>
-
-      <section v-if="activeCommunityItem?.communityType !== 'builtin'" class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot dynamic"></span>
-          API 白名单
-          <small>脚本只能调用这些 configKey</small>
-        </div>
-        <div class="community-detail-tags">
-          <span v-for="key in parseJsonArray(activeCommunityItem?.linkedRequestKeys)" :key="key">{{ key }}</span>
-          <span v-if="!parseJsonArray(activeCommunityItem?.linkedRequestKeys).length">未绑定 API</span>
-        </div>
-      </section>
-
-      <section v-if="activeCommunityItem?.communityType !== 'builtin'" class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot dynamic"></span>
-          Groovy 脚本
-          <small>tools/call 命中动态工具后执行</small>
-        </div>
-        <pre class="detail-code script-code">{{ activeCommunityItem?.groovyScript || '暂无脚本内容' }}</pre>
-      </section>
-
-      <section v-else class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot builtin"></span>
-          实现方式
-          <small>内置工具由 Java 方法注册</small>
-        </div>
-        <pre class="detail-code script-code">Java @Tool：{{ activeCommunityItem?.displayName || activeCommunityItem?.toolName }}</pre>
-      </section>
-    </template>
-
-    <template v-else-if="activeCommunityItem?.communityKind === 'prompt'">
-      <section class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot builtin"></span>
-          基础信息
-          <small>MCP Prompt</small>
-        </div>
-        <div class="detail-grid">
-          <div>
-            <span>Prompt 名称</span>
-            <b>{{ activeCommunityItem?.promptName || '-' }}</b>
-          </div>
-          <div>
-            <span>标题</span>
-            <b>{{ activeCommunityItem?.title || '-' }}</b>
-          </div>
-          <div>
-            <span>参数数量</span>
-            <b>{{ parseJsonArray(activeCommunityItem?.argumentsSchema).length }}</b>
-          </div>
-          <div>
-            <span>建议工具</span>
-            <b>{{ parseJsonArray(activeCommunityItem?.linkedToolNames).length }}</b>
-          </div>
-        </div>
-        <p class="permission-hint detail-desc">{{ activeCommunityItem?.description || '暂无 Prompt 描述' }}</p>
-      </section>
-
-      <section class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot dynamic"></span>
-          参数 Schema
-          <small>prompts/get 渲染时需要的参数</small>
-        </div>
-        <pre class="detail-code">{{ prettyJsonText(activeCommunityItem?.argumentsSchema || '[]') }}</pre>
-      </section>
-
-      <section class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot dynamic"></span>
-          建议工具
-          <small>Prompt 会引导 Agent 优先使用</small>
-        </div>
-        <div class="community-detail-tags">
-          <span v-for="name in parseJsonArray(activeCommunityItem?.linkedToolNames)" :key="name">{{ name }}</span>
-          <span v-if="!parseJsonArray(activeCommunityItem?.linkedToolNames).length">未绑定工具</span>
-        </div>
-      </section>
-
-      <section class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot builtin"></span>
-          模板内容
-          <small>Prompt 原文</small>
-        </div>
-        <pre class="detail-code script-code">{{ activeCommunityItem?.templateContent || '暂无模板内容' }}</pre>
-      </section>
-    </template>
-
-    <template v-else-if="activeCommunityItem?.communityKind === 'resource'">
-      <section class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot builtin"></span>
-          基础信息
-          <small>MCP Resource</small>
-        </div>
-        <div class="detail-grid">
-          <div>
-            <span>Resource URI</span>
-            <b>{{ activeCommunityItem?.resourceUri || '-' }}</b>
-          </div>
-          <div>
-            <span>名称</span>
-            <b>{{ activeCommunityItem?.name || '-' }}</b>
-          </div>
-          <div>
-            <span>MIME 类型</span>
-            <b>{{ activeCommunityItem?.mimeType || 'text/markdown' }}</b>
-          </div>
-          <div>
-            <span>文件</span>
-            <b>{{ activeCommunityItem?.fileName || '-' }}</b>
-          </div>
-        </div>
-        <p class="permission-hint detail-desc">{{ activeCommunityItem?.description || '暂无 Resource 描述' }}</p>
-      </section>
-
-      <section class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot dynamic"></span>
-          读取方式
-          <small>进入 Token 和角色权限后可通过 MCP 读取</small>
-        </div>
-        <pre class="detail-code">resources/read({ "uri": "{{ activeCommunityItem?.resourceUri || '' }}" })</pre>
-      </section>
-
-      <section class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot builtin"></span>
-          Resource 内容
-          <small>{{ communityResourceContentLoading ? '读取中' : 'Markdown 正文' }}</small>
-        </div>
-        <pre v-if="communityResourceContentLoading" class="detail-code script-code">正在读取 Resource 内容...</pre>
-        <pre v-else-if="communityResourceContent" class="detail-code script-code">{{ communityResourceContent }}</pre>
-        <pre v-else class="detail-code script-code">{{ communityResourceContentError || '暂无内容' }}</pre>
-      </section>
-    </template>
-
-    <template v-else-if="activeCommunityItem?.communityKind === 'api'">
-      <section class="tool-option-section">
-        <div class="tool-option-title">
-          <span class="tool-type-dot builtin"></span>
-          基础信息
-          <small>API 能力</small>
-        </div>
-        <div class="detail-grid">
-          <div>
-            <span>配置 Key</span>
-            <b>{{ activeCommunityItem?.configKey || '-' }}</b>
-          </div>
-          <div>
-            <span>接口编号</span>
-            <b>{{ activeCommunityItem?.requestId || communityCode('API', activeCommunityItem?.id) }}</b>
-          </div>
-          <div>
-            <span>请求方式</span>
-            <b>{{ activeCommunityItem?.type || 'HTTP' }} / {{ activeCommunityItem?.method || 'GET' }}</b>
-          </div>
-          <div>
-            <span>分类</span>
-            <b>{{ activeCommunityItem?.category || '未分类' }}</b>
-          </div>
-        </div>
-        <p class="permission-hint detail-desc">{{ activeCommunityItem?.description || activeCommunityItem?.name || '暂无 API 描述' }}</p>
-      </section>
-    </template>
-
-    <template #footer>
-      <a-button
-        v-if="activeCommunityItem?.communityKind !== 'api'"
-        :class="['community-like-modal-btn', activeCommunityItem?.liked ? 'liked' : '']"
-        @click="toggleCommunityLike(activeCommunityItem)"
-      >{{ likeLabel(activeCommunityItem) }}</a-button>
-      <a-button type="primary" @click="communityDetailOpen=false">关闭</a-button>
-    </template>
-  </a-modal>
-  <a-modal v-model:open="dynamicToolDetailOpen" :title="`动态工具详情 · ${activeDynamicTool?.toolName || ''}`" width="860px" class="tool-permission-modal dynamic-tool-detail-modal">
-    <section class="tool-option-section">
-      <div class="tool-option-title">
-        <span class="tool-type-dot dynamic"></span>
-        基础信息
-        <small>{{ Number(activeDynamicTool?.enabled) === 1 ? '启用' : '禁用' }}</small>
-      </div>
-      <div class="detail-grid">
-        <div>
-          <span>工具名</span>
-          <b>{{ activeDynamicTool?.toolName || '-' }}</b>
-        </div>
-        <div>
-          <span>API 白名单</span>
-          <b>{{ linkedRequestLabel(activeDynamicTool?.linkedRequestKeys) }}</b>
-        </div>
-        <div>
-          <span>数据源白名单</span>
-          <b>{{ linkedDataSourceLabel(activeDynamicTool?.linkedDataSourceIds) }}</b>
-        </div>
-      </div>
-      <p class="permission-hint detail-desc">{{ activeDynamicTool?.toolDescription || '暂无工具描述' }}</p>
-    </section>
-
-    <section class="tool-option-section">
-      <div class="tool-option-title">
-        <span class="tool-type-dot builtin"></span>
-        入参 Schema
-        <small>tools/list 暴露给 AI Client 的参数结构</small>
-      </div>
-      <pre class="detail-code">{{ activeDynamicTool?.inputSchema || '{}' }}</pre>
-    </section>
-
-    <section class="tool-option-section">
-      <div class="tool-option-title">
-        <span class="tool-type-dot dynamic"></span>
-        Groovy 脚本
-        <small>tools/call 命中动态工具后执行</small>
-      </div>
-      <pre class="detail-code script-code">{{ activeDynamicTool?.groovyScript || '' }}</pre>
-    </section>
-
-    <template #footer>
-      <a-button type="primary" @click="dynamicToolDetailOpen=false">关闭</a-button>
-    </template>
-  </a-modal>
-  <a-modal v-model:open="auditDetailOpen" :title="`调用详情 · ${activeAuditLog?.capabilityName || activeAuditLog?.toolName || ''}`" width="860px" class="tool-permission-modal dynamic-tool-detail-modal">
-    <section class="tool-option-section">
-      <div class="tool-option-title">
-        <span class="tool-type-dot builtin"></span>
-        调用信息
-        <small>{{ activeAuditLog?.status || '-' }}</small>
-      </div>
-      <div class="detail-grid audit-detail-grid">
-        <div>
-          <span>调用时间</span>
-          <b>{{ activeAuditLog?.createTime || '-' }}</b>
-        </div>
-        <div>
-          <span>调用用户</span>
-          <b>{{ activeAuditLog?.userName || '-' }}</b>
-        </div>
-        <div>
-          <span>能力类型</span>
-          <b>{{ capabilityTypeLabel(activeAuditLog?.capabilityType) }}</b>
-        </div>
-        <div>
-          <span>能力名称</span>
-          <b>{{ activeAuditLog?.capabilityName || activeAuditLog?.toolName || '-' }}</b>
-        </div>
-        <div>
-          <span>调用动作</span>
-          <b>{{ capabilityActionLabel(activeAuditLog?.capabilityAction) }}</b>
-        </div>
-        <div>
-          <span>耗时</span>
-          <b>{{ activeAuditLog?.durationMs ?? '-' }} ms</b>
-        </div>
-      </div>
-    </section>
-
-    <section class="tool-option-section">
-      <div class="tool-option-title">
-        <span class="tool-type-dot dynamic"></span>
-        请求参数
-        <small>MCP 请求参数摘要</small>
-      </div>
-      <pre class="detail-code">{{ activeAuditLog?.requestParams || '-' }}</pre>
-    </section>
-
-    <section class="tool-option-section">
-      <div class="tool-option-title">
-        <span class="tool-type-dot builtin"></span>
-        响应摘要
-        <small>MCP 响应结果摘要</small>
-      </div>
-      <pre class="detail-code script-code">{{ activeAuditLog?.responseSummary || '-' }}</pre>
-    </section>
-
-    <section v-if="activeAuditLog?.errorMessage" class="tool-option-section">
-      <div class="tool-option-title">
-        <span class="tool-type-dot dynamic"></span>
-        错误信息
-        <small>失败调用才会出现</small>
-      </div>
-      <pre class="detail-code error-code">{{ activeAuditLog.errorMessage }}</pre>
-    </section>
-
-    <template #footer>
-      <a-button type="primary" @click="auditDetailOpen=false">关闭</a-button>
-    </template>
-  </a-modal>
-  <a-modal v-model:open="userRoleOpen" :title="`分配角色 · ${activeUser?.displayName || activeUser?.username || ''}`" width="720px" class="tool-permission-modal" @ok="saveUserRoles">
-    <p class="permission-hint">用户通过角色获得 Tool 和 Prompt 资格。分配角色后，还需要在“角色与能力权限”里配置该角色能使用哪些能力。</p>
-    <section class="tool-option-section">
-      <div class="tool-option-title">
-        <span class="tool-type-dot builtin"></span>
-        可选角色
-        <small>来自角色配置</small>
-      </div>
-      <a-checkbox-group v-model:value="selectedUserRoles" class="tool-option-grid">
-        <a-checkbox
-          v-for="role in roles"
-          :key="role.roleCode"
-          :value="role.roleCode"
-          :disabled="role.isEnabled !== 1"
-        >
-          <b>{{ role.roleCode }}</b>
-          <span>{{ role.roleName || '未命名角色' }}</span>
-          <em v-if="role.description">{{ role.description }}</em>
-        </a-checkbox>
-      </a-checkbox-group>
-      <a-empty v-if="!roles.length" description="暂无可分配角色" :image-style="{height:'48px'}" />
-    </section>
-    <template #footer>
-      <a-button @click="userRoleOpen=false">取消</a-button>
-      <a-button type="primary" @click="saveUserRoles">保存角色</a-button>
-    </template>
-  </a-modal>
-  <a-modal v-model:open="toolPermissionOpen" :title="`配置工具权限 · ${activeRole?.roleName || ''}`" width="720px" class="tool-permission-modal" @ok="saveRoleTools">
-    <p class="permission-hint">角色工具权限是资格上限。Token 是否实际展示和调用工具，还需要在 Token 工具选择中单独配置。</p>
-    <div class="permission-bulk-actions"><a-button size="small" @click="selectAllRoleTools">全选</a-button><a-button size="small" @click="clearRoleTools">清空</a-button></div>
-    <a-checkbox-group v-model:value="selectedRoleTools" class="tool-option-groups">
-      <section class="tool-option-section"><div class="tool-option-title"><span class="tool-type-dot builtin"></span>内置工具 <small>由 Spring AI 注册</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectRoleToolGroup('builtin')">全选</a-button><a-button size="small" @click="clearRoleToolGroup('builtin')">取消</a-button></span></div><div class="tool-option-grid"><a-checkbox v-for="tool in builtinTools" :key="tool.name" :value="tool.name"><b>{{ tool.name }}</b><span>{{ tool.description }}</span></a-checkbox></div></section>
-      <section class="tool-option-section"><div class="tool-option-title"><span class="tool-type-dot dynamic"></span>动态工具 <small>由创作空间发布</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectRoleToolGroup('dynamic')">全选</a-button><a-button size="small" @click="clearRoleToolGroup('dynamic')">取消</a-button></span></div><div class="tool-option-grid"><a-checkbox v-for="tool in dynamicToolOptions" :key="tool.toolName" :value="tool.toolName" :disabled="tool.enabled !== 1"><b>{{ tool.toolName }}</b><span>{{ tool.toolDescription || '暂无描述' }}</span></a-checkbox></div><a-empty v-if="!dynamicToolOptions.length" description="暂无已发布动态工具" :image-style="{height:'48px'}" /></section>
-      <section class="tool-option-section"><div class="tool-option-title"><span class="tool-type-dot remote"></span>飞书远程工具 <small>从飞书 MCP 实时发现</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectRoleToolGroup('remote')">全选</a-button><a-button size="small" @click="clearRoleToolGroup('remote')">取消</a-button></span></div><div class="tool-option-grid"><a-checkbox v-for="tool in feishuToolOptions" :key="tool.name" :value="tool.name"><b>{{ tool.name }}</b><span>{{ tool.description || '暂无描述' }}</span></a-checkbox></div><a-empty v-if="!feishuToolOptions.length" description="未发现飞书远程工具" :image-style="{height:'48px'}" /></section>
-    </a-checkbox-group>
-    <template #footer><a-button @click="toolPermissionOpen=false">取消</a-button><a-button type="primary" @click="saveRoleTools">保存工具权限</a-button></template>
-  </a-modal>
-  <a-modal v-model:open="promptPermissionOpen" :title="`配置 Prompt 权限 · ${activeRole?.roleName || ''}`" width="720px" class="tool-permission-modal" @ok="saveRolePrompts">
-    <p class="permission-hint">角色 Prompt 权限是 prompts/list / prompts/get 的资格上限。Token 是否实际可见，还需要在 Token Prompt 选择中单独配置。</p>
-    <div class="permission-bulk-actions"><a-button size="small" @click="selectAllRolePrompts">全选</a-button><a-button size="small" @click="clearRolePrompts">清空</a-button></div>
-    <section class="tool-option-section">
-      <div class="tool-option-title"><span class="tool-type-dot dynamic"></span>Prompt 模板 <small>由创作空间发布</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectAllRolePrompts">全选</a-button><a-button size="small" @click="clearRolePrompts">清空</a-button></span></div>
-      <a-checkbox-group v-model:value="selectedRolePrompts" class="tool-option-grid">
-        <a-checkbox v-for="prompt in promptOptions" :key="prompt.promptName" :value="prompt.promptName" :disabled="prompt.enabled !== 1 || Number(prompt.publishStatus) === 0">
-          <b>{{ prompt.promptName }}</b>
-          <span>{{ prompt.title || prompt.description || '暂无描述' }}</span>
-          <em>{{ Number(prompt.publishStatus) === 0 ? '草稿未上线' : Number(prompt.publishStatus) === 2 ? '公开' : '不公开' }}</em>
-        </a-checkbox>
-      </a-checkbox-group>
-      <a-empty v-if="!promptOptions.length" description="暂无 Prompt 模板" :image-style="{height:'48px'}" />
-    </section>
-    <template #footer><a-button @click="promptPermissionOpen=false">取消</a-button><a-button type="primary" @click="saveRolePrompts">保存 Prompt 权限</a-button></template>
-  </a-modal>
-  <a-modal v-model:open="resourcePermissionOpen" :title="`配置 Resource 权限 · ${activeRole?.roleName || ''}`" width="720px" class="tool-permission-modal" @ok="saveRoleResources">
-    <p class="permission-hint">角色 Resource 权限是 resources/list / resources/read 的资格上限。Token 是否实际可见，还需要在 Token Resource 选择中单独配置。</p>
-    <div class="permission-bulk-actions"><a-button size="small" @click="selectAllRoleResources">全选</a-button><a-button size="small" @click="clearRoleResources">清空</a-button></div>
-    <section class="tool-option-section">
-      <div class="tool-option-title"><span class="tool-type-dot dynamic"></span>Markdown 资源 <small>由创作空间发布</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectAllRoleResources">全选</a-button><a-button size="small" @click="clearRoleResources">清空</a-button></span></div>
-      <a-checkbox-group v-model:value="selectedRoleResources" class="tool-option-grid">
-        <a-checkbox v-for="resource in resourceOptions" :key="resource.resourceUri" :value="resource.resourceUri" :disabled="resource.enabled !== 1 || Number(resource.publishStatus) === 0">
-          <b>{{ resource.name || resource.resourceUri }}</b>
-          <span>{{ resource.resourceUri }}</span>
-          <em>{{ Number(resource.publishStatus) === 0 ? '草稿未上线' : Number(resource.publishStatus) === 2 ? '公开' : '不公开' }}</em>
-        </a-checkbox>
-      </a-checkbox-group>
-      <a-empty v-if="!resourceOptions.length" description="暂无 Resource" :image-style="{height:'48px'}" />
-    </section>
-    <template #footer><a-button @click="resourcePermissionOpen=false">取消</a-button><a-button type="primary" @click="saveRoleResources">保存 Resource 权限</a-button></template>
-  </a-modal>
-  <a-modal v-model:open="tokenSelectionOpen" :title="`Token 工具选择 · ${activeToken?.tokenName || ''}`" width="720px" class="tool-permission-modal" @ok="saveTokenSelections">
-    <p class="permission-hint">Token 工具选择决定这把 Token 实际加载、展示和允许调用哪些工具；最终调用还会再经过角色工具权限校验。</p>
-    <div class="permission-bulk-actions"><a-button size="small" @click="selectAllTokenTools">全选</a-button><a-button size="small" @click="clearTokenTools">清空</a-button></div>
-    <a-checkbox-group v-model:value="selectedTokenTools" class="tool-option-groups">
-      <section class="tool-option-section"><div class="tool-option-title"><span class="tool-type-dot builtin"></span>内置工具 <small>由 Spring AI 注册</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectTokenToolGroup('builtin')">全选</a-button><a-button size="small" @click="clearTokenToolGroup('builtin')">取消</a-button></span></div><div class="tool-option-grid"><a-checkbox v-for="tool in builtinTools" :key="tool.name" :value="tool.name"><b>{{ tool.name }}</b><span>{{ tool.description }}</span></a-checkbox></div></section>
-      <section class="tool-option-section"><div class="tool-option-title"><span class="tool-type-dot dynamic"></span>动态工具 <small>由创作空间发布</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectTokenToolGroup('dynamic')">全选</a-button><a-button size="small" @click="clearTokenToolGroup('dynamic')">取消</a-button></span></div><div class="tool-option-grid"><a-checkbox v-for="tool in dynamicToolOptions" :key="tool.toolName" :value="tool.toolName" :disabled="tool.enabled !== 1"><b>{{ tool.toolName }}</b><span>{{ tool.toolDescription || '暂无描述' }}</span></a-checkbox></div><a-empty v-if="!dynamicToolOptions.length" description="暂无已发布动态工具" :image-style="{height:'48px'}" /></section>
-      <section class="tool-option-section"><div class="tool-option-title"><span class="tool-type-dot remote"></span>飞书远程工具 <small>从飞书 MCP 实时发现</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectTokenToolGroup('remote')">全选</a-button><a-button size="small" @click="clearTokenToolGroup('remote')">取消</a-button></span></div><div class="tool-option-grid"><a-checkbox v-for="tool in feishuToolOptions" :key="tool.name" :value="tool.name"><b>{{ tool.name }}</b><span>{{ tool.description || '暂无描述' }}</span></a-checkbox></div><a-empty v-if="!feishuToolOptions.length" description="未发现飞书远程工具" :image-style="{height:'48px'}" /></section>
-    </a-checkbox-group>
-    <template #footer><a-button @click="tokenSelectionOpen=false">取消</a-button><a-button type="primary" @click="saveTokenSelections">保存工具选择</a-button></template>
-  </a-modal>
-  <a-modal v-model:open="tokenPromptSelectionOpen" :title="`Token Prompt 选择 · ${activeToken?.tokenName || ''}`" width="720px" class="tool-permission-modal" @ok="saveTokenPromptSelections">
-    <p class="permission-hint">Token Prompt 选择决定这把 Token 的 prompts/list 实际返回哪些模板；最终还会再经过角色 Prompt 权限校验。</p>
-    <div class="permission-bulk-actions"><a-button size="small" @click="selectAllTokenPrompts">全选</a-button><a-button size="small" @click="clearTokenPrompts">清空</a-button></div>
-    <section class="tool-option-section">
-      <div class="tool-option-title"><span class="tool-type-dot dynamic"></span>Prompt 模板 <small>由创作空间发布</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectAllTokenPrompts">全选</a-button><a-button size="small" @click="clearTokenPrompts">清空</a-button></span></div>
-      <a-checkbox-group v-model:value="selectedTokenPrompts" class="tool-option-grid">
-        <a-checkbox v-for="prompt in promptOptions" :key="prompt.promptName" :value="prompt.promptName" :disabled="prompt.enabled !== 1 || Number(prompt.publishStatus) === 0">
-          <b>{{ prompt.promptName }}</b>
-          <span>{{ prompt.title || prompt.description || '暂无描述' }}</span>
-          <em>{{ Number(prompt.publishStatus) === 0 ? '草稿未上线' : Number(prompt.publishStatus) === 2 ? '公开' : '不公开' }}</em>
-        </a-checkbox>
-      </a-checkbox-group>
-      <a-empty v-if="!promptOptions.length" description="暂无 Prompt 模板" :image-style="{height:'48px'}" />
-    </section>
-    <template #footer><a-button @click="tokenPromptSelectionOpen=false">取消</a-button><a-button type="primary" @click="saveTokenPromptSelections">保存 Prompt 选择</a-button></template>
-  </a-modal>
-  <a-modal v-model:open="tokenResourceSelectionOpen" :title="`Token Resource 选择 · ${activeToken?.tokenName || ''}`" width="720px" class="tool-permission-modal" @ok="saveTokenResourceSelections">
-    <p class="permission-hint">Token Resource 选择决定这把 Token 的 resources/list 实际返回哪些资源；最终还会再经过角色 Resource 权限校验。</p>
-    <div class="permission-bulk-actions"><a-button size="small" @click="selectAllTokenResources">全选</a-button><a-button size="small" @click="clearTokenResources">清空</a-button></div>
-    <section class="tool-option-section">
-      <div class="tool-option-title"><span class="tool-type-dot dynamic"></span>Markdown 资源 <small>由创作空间发布</small><span class="tool-option-inline-actions"><a-button size="small" @click="selectAllTokenResources">全选</a-button><a-button size="small" @click="clearTokenResources">清空</a-button></span></div>
-      <a-checkbox-group v-model:value="selectedTokenResources" class="tool-option-grid">
-        <a-checkbox v-for="resource in resourceOptions" :key="resource.resourceUri" :value="resource.resourceUri" :disabled="resource.enabled !== 1 || Number(resource.publishStatus) === 0">
-          <b>{{ resource.name || resource.resourceUri }}</b>
-          <span>{{ resource.resourceUri }}</span>
-          <em>{{ Number(resource.publishStatus) === 0 ? '草稿未上线' : Number(resource.publishStatus) === 2 ? '公开' : '不公开' }}</em>
-        </a-checkbox>
-      </a-checkbox-group>
-      <a-empty v-if="!resourceOptions.length" description="暂无 Resource" :image-style="{height:'48px'}" />
-    </section>
-    <template #footer><a-button @click="tokenResourceSelectionOpen=false">取消</a-button><a-button type="primary" @click="saveTokenResourceSelections">保存 Resource 选择</a-button></template>
-  </a-modal>
-  </a-config-provider>
-  </template>
+  <ToastHost />
 </template>
