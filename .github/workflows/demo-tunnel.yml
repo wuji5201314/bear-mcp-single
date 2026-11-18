@@ -1,0 +1,122 @@
+name: Demo (temporary public tunnel)
+
+# Builds the backend-free demo bundle, serves it on the runner and exposes it
+# through a Cloudflare quick tunnel so the console can be opened from anywhere.
+# The URL is printed in the run summary; the tunnel dies when the job ends.
+
+on:
+  workflow_dispatch:
+    inputs:
+      minutes:
+        description: 'How long to keep the tunnel alive (5-350)'
+        required: false
+        default: '60'
+
+permissions:
+  contents: read
+
+jobs:
+  tunnel:
+    name: Serve demo via cloudflared
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    defaults:
+      run:
+        working-directory: admin-web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: admin-web/package-lock.json
+
+      - name: Install
+        run: npm ci
+
+      - name: Build demo
+        env:
+          VITE_BASE: /
+        run: npm run build:demo
+
+      - name: Start static server
+        run: |
+          cat > serve.mjs <<'EOF'
+          import http from 'node:http'
+          import fs from 'node:fs'
+          import path from 'node:path'
+
+          const root = 'dist-demo'
+          const types = {
+            '.html': 'text/html; charset=utf-8',
+            '.js': 'text/javascript; charset=utf-8',
+            '.css': 'text/css; charset=utf-8',
+            '.svg': 'image/svg+xml',
+            '.png': 'image/png',
+            '.json': 'application/json; charset=utf-8'
+          }
+
+          http
+            .createServer((req, res) => {
+              const urlPath = decodeURIComponent(new URL(req.url, 'http://x').pathname)
+              let file = path.join(root, urlPath)
+              if (!fs.existsSync(file) || fs.statSync(file).isDirectory()) {
+                file = path.join(root, 'index.html')
+              }
+              res.writeHead(200, { 'Content-Type': types[path.extname(file)] || 'application/octet-stream' })
+              fs.createReadStream(file).pipe(res)
+            })
+            .listen(8080, '127.0.0.1', () => console.log('demo server on 8080'))
+          EOF
+          nohup node serve.mjs > /tmp/server.log 2>&1 &
+          for i in $(seq 1 30); do
+            if curl -fsS -o /dev/null http://127.0.0.1:8080/; then break; fi
+            sleep 1
+          done
+          curl -fsS -o /dev/null -w 'local status: %{http_code}\n' http://127.0.0.1:8080/
+
+      - name: Start Cloudflare quick tunnel
+        run: |
+          curl -fsSL -o /tmp/cloudflared https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64
+          chmod +x /tmp/cloudflared
+          nohup /tmp/cloudflared tunnel --url http://127.0.0.1:8080 --no-autoupdate > /tmp/tunnel.log 2>&1 &
+          url=''
+          for i in $(seq 1 60); do
+            url=$(grep -oE 'https://[a-z0-9-]+\.trycloudflare\.com' /tmp/tunnel.log | head -n1 || true)
+            if [ -n "$url" ]; then break; fi
+            sleep 2
+          done
+          if [ -z "$url" ]; then
+            echo '### Tunnel failed' >> "$GITHUB_STEP_SUMMARY"
+            tail -n 50 /tmp/tunnel.log >> "$GITHUB_STEP_SUMMARY"
+            exit 1
+          fi
+          echo "DEMO_URL=$url" >> "$GITHUB_ENV"
+          {
+            echo '### Demo preview is live'
+            echo ''
+            echo "**$url**"
+            echo ''
+            echo 'Open it, then use the prefilled account on the login page (demo mode, all data is synthetic).'
+            echo ''
+            echo "This link stops working when the job ends."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "demo url: $url"
+
+      - name: Keep tunnel alive
+        run: |
+          minutes="${{ inputs.minutes }}"
+          case "$minutes" in (*[!0-9]*) minutes=60;; esac
+          if [ "$minutes" -lt 5 ]; then minutes=5; fi
+          if [ "$minutes" -gt 350 ]; then minutes=350; fi
+          echo "keeping $DEMO_URL alive for ${minutes}m"
+          end=$(( $(date +%s) + minutes * 60 ))
+          while [ "$(date +%s)" -lt "$end" ]; do
+            if ! pgrep -f 'cloudflared tunnel' > /dev/null; then
+              echo 'cloudflared exited early'
+              tail -n 30 /tmp/tunnel.log
+              exit 1
+            fi
+            sleep 30
+          done

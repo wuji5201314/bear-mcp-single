@@ -59,3 +59,5 @@ admin-web/.env.*.local
 tmp_*
 deploy/.env
 admin-web/deploy/.env
+# demo bundle produced by npm run build:demo
+admin-web/dist-demo
