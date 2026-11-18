@@ -6,6 +6,12 @@
 
 > 说明：本仓库为脱敏后的开源版本，示例数据中的组织名、域名、账号、密钥均已替换为 `xxx` 占位符，仅保留结构与玩法。
 
+## 在线预览
+
+不想装环境，想先看界面：**https://wuji5201314.github.io/bear-mcp-single/**
+
+这是纯前端 demo 构建（`npm run build:demo`），浏览器内 mock 了全部接口，数据是合成的，登录页账号已预填，点一下就能逛完整后台。生产构建不包含这层 mock。
+
 ## 功能
 
 - **MCP 网关**：Streamable HTTP 协议，支持 tools / prompts / resources 三类能力，按 Token 授权
@@ -82,6 +88,14 @@ npm run dev     # http://localhost:5173，/api 已代理到 8090
 ```
 
 用 `demo-admin / admin123` 登录。
+
+只想看界面、没有后端时：
+
+```bash
+cd admin-web
+npm run build:demo   # 产物在 dist-demo/，浏览器内 mock 全部接口
+npx --yes serve -s dist-demo -l 4173
+```
 
 ### 4. 调一次 MCP
 
