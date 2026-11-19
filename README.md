@@ -144,7 +144,8 @@ curl -s http://localhost:8090/mcp \
 ## 部署
 
 ```bash
-cp deploy/.env.example deploy/.env   # 填入真实配置
+docker build -t mcpforge:latest .        # 多阶段构建：前端 → 后端 jar → 运行时镜像
+cp deploy/.env.example deploy/.env       # 填入真实配置
 docker compose -f deploy/docker-compose.yml up -d
 ```
 
