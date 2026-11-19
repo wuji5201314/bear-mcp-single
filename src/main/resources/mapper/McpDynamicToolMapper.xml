@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" "https://mybatis.org/dtd/mybatis-3-mapper.dtd">
-<mapper namespace="com.bear.mcp.single.core.mapper.McpDynamicToolMapper">
-    <select id="findEnabledByName" resultType="com.bear.mcp.single.core.entity.McpDynamicToolEntity">
+<mapper namespace="com.mcpforge.core.mapper.McpDynamicToolMapper">
+    <select id="findEnabledByName" resultType="com.mcpforge.core.entity.McpDynamicToolEntity">
         SELECT id, tool_name, tool_description, input_schema, groovy_script,
                linked_request_keys, linked_data_source_ids, linked_feishu_tool_names,
                linked_remote_credentials, linked_mcp_keys,
@@ -10,7 +10,7 @@
         WHERE tool_name = #{toolName} AND is_enabled = 1 AND publish_status != 0
         LIMIT 1
     </select>
-    <select id="findById" resultType="com.bear.mcp.single.core.entity.McpDynamicToolEntity">
+    <select id="findById" resultType="com.mcpforge.core.entity.McpDynamicToolEntity">
         SELECT id, tool_name, tool_description, input_schema, groovy_script,
                linked_request_keys, linked_data_source_ids, linked_feishu_tool_names,
                linked_remote_credentials, linked_mcp_keys,
@@ -19,7 +19,7 @@
         WHERE id = #{id}
         LIMIT 1
     </select>
-    <select id="findByName" resultType="com.bear.mcp.single.core.entity.McpDynamicToolEntity">
+    <select id="findByName" resultType="com.mcpforge.core.entity.McpDynamicToolEntity">
         SELECT id, tool_name, tool_description, input_schema, groovy_script,
                linked_request_keys, linked_data_source_ids, linked_feishu_tool_names,
                linked_remote_credentials, linked_mcp_keys,
@@ -28,7 +28,7 @@
         WHERE tool_name = #{toolName}
         LIMIT 1
     </select>
-    <select id="findAll" resultType="com.bear.mcp.single.core.entity.McpDynamicToolEntity">
+    <select id="findAll" resultType="com.mcpforge.core.entity.McpDynamicToolEntity">
         SELECT id, tool_name, tool_description, input_schema, groovy_script,
                linked_request_keys, linked_data_source_ids, linked_feishu_tool_names,
                linked_remote_credentials, linked_mcp_keys,
@@ -36,7 +36,7 @@
         FROM mcp_dynamic_tool
         ORDER BY id DESC
     </select>
-    <select id="findPublicTools" resultType="com.bear.mcp.single.core.entity.McpDynamicToolEntity">
+    <select id="findPublicTools" resultType="com.mcpforge.core.entity.McpDynamicToolEntity">
         SELECT id, tool_name, tool_description, input_schema, groovy_script,
                linked_request_keys, linked_data_source_ids, linked_feishu_tool_names,
                linked_remote_credentials, linked_mcp_keys,
@@ -46,11 +46,11 @@
           AND publish_status = 2
         ORDER BY id DESC
     </select>
-    <insert id="insert" parameterType="com.bear.mcp.single.core.entity.McpDynamicToolEntity" useGeneratedKeys="true" keyProperty="id">
+    <insert id="insert" parameterType="com.mcpforge.core.entity.McpDynamicToolEntity" useGeneratedKeys="true" keyProperty="id">
         INSERT INTO mcp_dynamic_tool (tool_name, tool_description, input_schema, groovy_script, linked_request_keys, linked_data_source_ids, linked_feishu_tool_names, linked_remote_credentials, linked_mcp_keys, is_enabled, publish_status)
         VALUES (#{toolName}, #{toolDescription}, #{inputSchema}, #{groovyScript}, #{linkedRequestKeys}, #{linkedDataSourceIds}, #{linkedFeishuToolNames}, #{linkedRemoteCredentials}, #{linkedMcpKeys}, #{enabled}, #{publishStatus})
     </insert>
-    <update id="update" parameterType="com.bear.mcp.single.core.entity.McpDynamicToolEntity">
+    <update id="update" parameterType="com.mcpforge.core.entity.McpDynamicToolEntity">
         UPDATE mcp_dynamic_tool
         SET tool_name=#{toolName},
             tool_description=#{toolDescription},

@@ -1,7 +1,7 @@
 services:
-  bear-mcp-admin-web:
-    image: ${BEAR_MCP_ADMIN_WEB_IMAGE:-bear-mcp-admin-web:latest}
-    container_name: bear-mcp-admin-web
+  mcpforge-admin-web:
+    image: ${MCPFORGE_ADMIN_WEB_IMAGE:-mcpforge-admin-web:latest}
+    container_name: mcpforge-admin-web
     restart: unless-stopped
     ports:
       - "8091:80"

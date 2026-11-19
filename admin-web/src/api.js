@@ -1,5 +1,5 @@
-const ADMIN_TOKEN_KEY = 'bear_mcp_admin_token'
-const UNAUTHORIZED_EVENT = 'bear-mcp-admin-unauthorized'
+const ADMIN_TOKEN_KEY = 'mcpforge_admin_token'
+const UNAUTHORIZED_EVENT = 'mcpforge-admin-unauthorized'
 
 function redirectToLogin() {
   localStorage.removeItem(ADMIN_TOKEN_KEY)

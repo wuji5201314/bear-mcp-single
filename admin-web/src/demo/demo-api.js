@@ -108,5 +108,5 @@ export function installDemoApi() {
   }
 
   // eslint-disable-next-line no-console
-  console.info('[bear-mcp] demo mode: API responses are mocked in the browser')
+  console.info('[mcpforge] demo mode: API responses are mocked in the browser')
 }

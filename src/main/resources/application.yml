@@ -3,11 +3,11 @@ server:
 
 spring:
   application:
-    name: bear-mcp-single
+    name: mcpforge
   datasource:
-    url: ${BEAR_MYSQL_URL:jdbc:mysql://localhost:3306/bear_mcp_single?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
-    username: ${BEAR_MYSQL_USERNAME:root}
-    password: ${BEAR_MYSQL_PASSWORD:}
+    url: ${MCPFORGE_MYSQL_URL:jdbc:mysql://localhost:3306/mcpforge?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai
+    username: ${MCPFORGE_MYSQL_USERNAME:root}
+    password: ${MCPFORGE_MYSQL_PASSWORD:}
     driver-class-name: com.mysql.cj.jdbc.Driver
   sql:
     init:
@@ -32,38 +32,38 @@ mybatis:
 logging:
   level:
     root: INFO
-    com.bear.mcp.single: DEBUG
-    com.bear.mcp.single.core.mapper: WARN
+    com.mcpforge: DEBUG
+    com.mcpforge.core.mapper: WARN
     org.mybatis: WARN
     org.springframework.ai.mcp: INFO
 
-bear:
+mcpforge:
   admin:
-    jwt-secret: ${BEAR_ADMIN_JWT_SECRET:change-me-in-production}
-    jwt-expire-seconds: ${BEAR_ADMIN_JWT_EXPIRE_SECONDS:7200}
+    jwt-secret: ${MCPFORGE_ADMIN_JWT_SECRET:change-me-in-production}
+    jwt-expire-seconds: ${MCPFORGE_ADMIN_JWT_EXPIRE_SECONDS:7200}
   mcp:
-    demo-token: ${BEAR_MCP_DEMO_TOKEN:mcp_dev_token}
+    demo-token: ${MCPFORGE_MCP_DEMO_TOKEN:mcp_dev_token}
   storage:
     tos:
-      endpoint: ${BEAR_TOS_ENDPOINT:tos-cn-shanghai.volces.com}
-      public-endpoint: ${BEAR_TOS_PUBLIC_ENDPOINT:tos-cn-shanghai.volces.com}
-      region: ${BEAR_TOS_REGION:cn-shanghai}
-      bucket: ${BEAR_TOS_BUCKET:xxx-bucket}
-      access-key: ${BEAR_TOS_ACCESS_KEY:}
-      secret-key: ${BEAR_TOS_SECRET_KEY:}
-      upload-expire-seconds: ${BEAR_TOS_UPLOAD_EXPIRE_SECONDS:600}
+      endpoint: ${MCPFORGE_TOS_ENDPOINT:tos-cn-shanghai.volces.com}
+      public-endpoint: ${MCPFORGE_TOS_PUBLIC_ENDPOINT:tos-cn-shanghai.volces.com}
+      region: ${MCPFORGE_TOS_REGION:cn-shanghai}
+      bucket: ${MCPFORGE_TOS_BUCKET:xxx-bucket}
+      access-key: ${MCPFORGE_TOS_ACCESS_KEY:}
+      secret-key: ${MCPFORGE_TOS_SECRET_KEY:}
+      upload-expire-seconds: ${MCPFORGE_TOS_UPLOAD_EXPIRE_SECONDS:600}
   repository-command:
-    root: ${BEAR_REPOSITORY_ROOT:/data/repositories}
+    root: ${MCPFORGE_REPOSITORY_ROOT:/data/repositories}
     repositories:
-      xxx-admin: ${BEAR_XXX_ADMIN_REPOSITORY_DIRECTORY:xxx-admin}
-    timeout-seconds: ${BEAR_REPOSITORY_COMMAND_TIMEOUT_SECONDS:5}
-    max-output-lines: ${BEAR_REPOSITORY_COMMAND_MAX_OUTPUT_LINES:300}
-    max-output-bytes: ${BEAR_REPOSITORY_COMMAND_MAX_OUTPUT_BYTES:20000}
+      xxx-admin: ${MCPFORGE_XXX_ADMIN_REPOSITORY_DIRECTORY:xxx-admin}
+    timeout-seconds: ${MCPFORGE_REPOSITORY_COMMAND_TIMEOUT_SECONDS:5}
+    max-output-lines: ${MCPFORGE_REPOSITORY_COMMAND_MAX_OUTPUT_LINES:300}
+    max-output-bytes: ${MCPFORGE_REPOSITORY_COMMAND_MAX_OUTPUT_BYTES:20000}
 
 xxx:
   admin:
     base-url: ${XXX_ADMIN_BASE_URL:http://127.0.0.1:8080}
-    shared-secret: ${XXX_BEAR_MCP_SHARED_SECRET:}
+    shared-secret: ${MCPFORGE_XXX_SHARED_SECRET:}
 
 # 注意：目录文件里的 ${TAVILY_API_KEY} 由 RequestConfigService 通过
 # System.getenv() 读取真正的进程环境变量，不会读取本文件，
@@ -74,10 +74,10 @@ feishu:
   app-secret: ${FEISHU_APP_SECRET:}
   token:
     tenant-url: ${FEISHU_TENANT_TOKEN_URL:https://open.feishu.cn/open-apis/auth/v3/tenant_access_token/internal}
-    redis-key: ${FEISHU_TENANT_TOKEN_REDIS_KEY:bear:mcp:feishu:tenant-access-token}
+    redis-key: ${FEISHU_TENANT_TOKEN_REDIS_KEY:mcpforge:mcp:feishu:tenant-access-token}
   mcp:
     url: ${FEISHU_MCP_URL:https://mcp.feishu.cn/mcp}
-    # TAT 表示 Bear 用应用身份调用飞书 MCP。UAT 需要额外接用户 OAuth 授权流程。
+    # TAT 表示 MCPForge 用应用身份调用飞书 MCP。UAT 需要额外接用户 OAuth 授权流程。
     credential-type: ${FEISHU_MCP_CREDENTIAL_TYPE:TAT}
 
 volcengine:

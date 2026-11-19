@@ -1,7 +1,7 @@
 services:
-  bear-mcp-single:
-    image: ${BEAR_MCP_SINGLE_IMAGE:-bear-mcp-single:latest}
-    container_name: bear-mcp-single
+  mcpforge:
+    image: ${MCPFORGE_IMAGE:-mcpforge:latest}
+    container_name: mcpforge
     restart: unless-stopped
     ports:
       - "8090:8090"

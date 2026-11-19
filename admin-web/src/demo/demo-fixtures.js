@@ -24,13 +24,13 @@ export const requestConfigs = [
 ]
 
 export const dataSources = [
-  { id: 31, name: '演示库', datasourceKey: 'demo_db', description: '只读演示数据源', dbType: 'MYSQL', username: 'demo', jdbcUrl: 'jdbc:mysql://localhost:3306/bear_mcp_single', extraJdbcProps: '', publishStatus: 1, createTime: now }
+  { id: 31, name: '演示库', datasourceKey: 'demo_db', description: '只读演示数据源', dbType: 'MYSQL', username: 'demo', jdbcUrl: 'jdbc:mysql://localhost:3306/mcpforge', extraJdbcProps: '', publishStatus: 1, createTime: now }
 ]
 
 export const resources = [
-  { id: 41, resourceUri: 'bear://xxx/text-to-sql/business/student', name: '学员业务说明', description: '示例业务口径', mimeType: 'text/markdown', fileName: '001-xxx__text-to-sql__business__student.md', fileSize: 1979, enabled: 1, publishStatus: 2, createTime: now },
-  { id: 42, resourceUri: 'bear://xxx/text-to-sql/schema/student', name: 'student 表结构', description: '示例 DDL', mimeType: 'text/markdown', fileName: '002-xxx__text-to-sql__schema__student.md', fileSize: 1731, enabled: 1, publishStatus: 1, createTime: now },
-  { id: 43, resourceUri: 'bear://xxx/text-to-sql/table-catalog', name: '表目录', description: '示例表清单', mimeType: 'text/markdown', fileName: '003-xxx__text-to-sql__table-catalog.md', fileSize: 1800, enabled: 1, publishStatus: 0, createTime: now }
+  { id: 41, resourceUri: 'mcpforge://xxx/text-to-sql/business/student', name: '学员业务说明', description: '示例业务口径', mimeType: 'text/markdown', fileName: '001-xxx__text-to-sql__business__student.md', fileSize: 1979, enabled: 1, publishStatus: 2, createTime: now },
+  { id: 42, resourceUri: 'mcpforge://xxx/text-to-sql/schema/student', name: 'student 表结构', description: '示例 DDL', mimeType: 'text/markdown', fileName: '002-xxx__text-to-sql__schema__student.md', fileSize: 1731, enabled: 1, publishStatus: 1, createTime: now },
+  { id: 43, resourceUri: 'mcpforge://xxx/text-to-sql/table-catalog', name: '表目录', description: '示例表清单', mimeType: 'text/markdown', fileName: '003-xxx__text-to-sql__table-catalog.md', fileSize: 1800, enabled: 1, publishStatus: 0, createTime: now }
 ]
 
 export const dynamicTools = [
@@ -51,7 +51,7 @@ export const skills = [
 export const audits = [
   { id: 81, createTime: now, capabilityType: 'TOOL', capabilityName: 'echo_dynamic', capabilityAction: 'CALL', userName: 'demo-admin', status: 'SUCCESS', durationMs: 12, requestParams: '{"message":"hi"}', responseSummary: '{"ok":true,"echo":"hi"}', errorMessage: null },
   { id: 82, createTime: now, capabilityType: 'PROMPT', capabilityName: 'demo_text_to_sql_system', capabilityAction: 'RENDER', userName: 'demo-dev', status: 'FAILED', durationMs: 40, requestParams: null, responseSummary: null, errorMessage: '缺少必填参数 question' },
-  { id: 83, createTime: now, capabilityType: 'RESOURCE', capabilityName: 'bear://xxx/text-to-sql/schema/student', capabilityAction: 'READ', userName: 'demo-admin', status: 'SUCCESS', durationMs: 6, requestParams: null, responseSummary: '1731 bytes', errorMessage: null }
+  { id: 83, createTime: now, capabilityType: 'RESOURCE', capabilityName: 'mcpforge://xxx/text-to-sql/schema/student', capabilityAction: 'READ', userName: 'demo-admin', status: 'SUCCESS', durationMs: 6, requestParams: null, responseSummary: '1731 bytes', errorMessage: null }
 ]
 
 export const builtinTools = [

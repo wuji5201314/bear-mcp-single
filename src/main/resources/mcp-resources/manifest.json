@@ -4,7 +4,7 @@
     "mimeType": "text/markdown",
     "name": "学员业务说明（示例）",
     "description": "示例 Resource：Text-to-SQL 业务口径文档，说明字段口径与常见统计方式。",
-    "uri": "bear://xxx/text-to-sql/business/student",
+    "uri": "mcpforge://xxx/text-to-sql/business/student",
     "fileName": "001-xxx__text-to-sql__business__student.md"
   },
   {
@@ -12,7 +12,7 @@
     "mimeType": "text/markdown",
     "name": "student 表 DDL（示例）",
     "description": "示例 Resource：库表 DDL 文档，含索引与查询建议。",
-    "uri": "bear://xxx/text-to-sql/schema/student",
+    "uri": "mcpforge://xxx/text-to-sql/schema/student",
     "fileName": "002-xxx__text-to-sql__schema__student.md"
   },
   {
@@ -20,7 +20,7 @@
     "mimeType": "text/markdown",
     "name": "表目录（示例）",
     "description": "示例 Resource：表目录与常见关联路径，供 Text-to-SQL 选表参考。",
-    "uri": "bear://xxx/text-to-sql/table-catalog",
+    "uri": "mcpforge://xxx/text-to-sql/table-catalog",
     "fileName": "003-xxx__text-to-sql__table-catalog.md"
   }
 ]

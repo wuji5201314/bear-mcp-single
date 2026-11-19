@@ -6,48 +6,48 @@ spring:
     activate:
       on-profile: prod
   datasource:
-    url: ${BEAR_MYSQL_URL}
-    username: ${BEAR_MYSQL_USERNAME}
-    password: ${BEAR_MYSQL_PASSWORD}
+    url: ${MCPFORGE_MYSQL_URL}
+    username: ${MCPFORGE_MYSQL_USERNAME}
+    password: ${MCPFORGE_MYSQL_PASSWORD}
     driver-class-name: com.mysql.cj.jdbc.Driver
     hikari:
-      pool-name: bear-mcp-single-prod
-      minimum-idle: ${BEAR_DB_MIN_IDLE:5}
-      maximum-pool-size: ${BEAR_DB_MAX_POOL_SIZE:20}
-      connection-timeout: ${BEAR_DB_CONNECTION_TIMEOUT:30000}
-      idle-timeout: ${BEAR_DB_IDLE_TIMEOUT:600000}
-      max-lifetime: ${BEAR_DB_MAX_LIFETIME:1800000}
+      pool-name: mcpforge-prod
+      minimum-idle: ${MCPFORGE_DB_MIN_IDLE:5}
+      maximum-pool-size: ${MCPFORGE_DB_MAX_POOL_SIZE:20}
+      connection-timeout: ${MCPFORGE_DB_CONNECTION_TIMEOUT:30000}
+      idle-timeout: ${MCPFORGE_DB_IDLE_TIMEOUT:600000}
+      max-lifetime: ${MCPFORGE_DB_MAX_LIFETIME:1800000}
   sql:
     init:
       mode: never
 
-bear:
+mcpforge:
   admin:
-    jwt-secret: ${BEAR_ADMIN_JWT_SECRET}
-    jwt-expire-seconds: ${BEAR_ADMIN_JWT_EXPIRE_SECONDS:7200}
+    jwt-secret: ${MCPFORGE_ADMIN_JWT_SECRET}
+    jwt-expire-seconds: ${MCPFORGE_ADMIN_JWT_EXPIRE_SECONDS:7200}
   mcp:
-    demo-token: ${BEAR_MCP_DEMO_TOKEN}
+    demo-token: ${MCPFORGE_MCP_DEMO_TOKEN}
   storage:
     tos:
-      endpoint: ${BEAR_TOS_ENDPOINT}
-      public-endpoint: ${BEAR_TOS_PUBLIC_ENDPOINT:}
-      region: ${BEAR_TOS_REGION}
-      bucket: ${BEAR_TOS_BUCKET}
-      access-key: ${BEAR_TOS_ACCESS_KEY}
-      secret-key: ${BEAR_TOS_SECRET_KEY}
-      upload-expire-seconds: ${BEAR_TOS_UPLOAD_EXPIRE_SECONDS:600}
+      endpoint: ${MCPFORGE_TOS_ENDPOINT}
+      public-endpoint: ${MCPFORGE_TOS_PUBLIC_ENDPOINT:}
+      region: ${MCPFORGE_TOS_REGION}
+      bucket: ${MCPFORGE_TOS_BUCKET}
+      access-key: ${MCPFORGE_TOS_ACCESS_KEY}
+      secret-key: ${MCPFORGE_TOS_SECRET_KEY}
+      upload-expire-seconds: ${MCPFORGE_TOS_UPLOAD_EXPIRE_SECONDS:600}
   repository-command:
-    root: ${BEAR_REPOSITORY_ROOT:/data/repositories}
+    root: ${MCPFORGE_REPOSITORY_ROOT:/data/repositories}
     repositories:
-      xxx-admin: ${BEAR_XXX_ADMIN_REPOSITORY_DIRECTORY:xxx-admin}
-    timeout-seconds: ${BEAR_REPOSITORY_COMMAND_TIMEOUT_SECONDS:5}
-    max-output-lines: ${BEAR_REPOSITORY_COMMAND_MAX_OUTPUT_LINES:300}
-    max-output-bytes: ${BEAR_REPOSITORY_COMMAND_MAX_OUTPUT_BYTES:20000}
+      xxx-admin: ${MCPFORGE_XXX_ADMIN_REPOSITORY_DIRECTORY:xxx-admin}
+    timeout-seconds: ${MCPFORGE_REPOSITORY_COMMAND_TIMEOUT_SECONDS:5}
+    max-output-lines: ${MCPFORGE_REPOSITORY_COMMAND_MAX_OUTPUT_LINES:300}
+    max-output-bytes: ${MCPFORGE_REPOSITORY_COMMAND_MAX_OUTPUT_BYTES:20000}
 
 xxx:
   admin:
     base-url: ${XXX_ADMIN_BASE_URL:http://xxx-admin:8080}
-    shared-secret: ${XXX_BEAR_MCP_SHARED_SECRET}
+    shared-secret: ${MCPFORGE_XXX_SHARED_SECRET}
 
 feishu:
   app-id: ${FEISHU_APP_ID}
@@ -61,7 +61,7 @@ feishu:
 logging:
   level:
     root: INFO
-    com.bear.mcp.single: INFO
-    com.bear.mcp.single.core.mapper: WARN
+    com.mcpforge: INFO
+    com.mcpforge.core.mapper: WARN
     org.mybatis: WARN
     org.springframework.ai.mcp: INFO

@@ -32,9 +32,9 @@ async function submit() {
   <div class="auth">
     <aside class="auth-art">
       <div class="row" style="gap: 10px">
-        <span class="brand-mark">B</span>
+        <span class="brand-mark">M</span>
         <div class="brand-text">
-          <b>Bear MCP</b>
+          <b>MCPForge</b>
           <small>Admin Console</small>
         </div>
       </div>

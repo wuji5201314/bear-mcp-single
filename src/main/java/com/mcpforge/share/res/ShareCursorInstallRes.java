@@ -1,0 +1,11 @@
+package com.mcpforge.share.res;
+
+import lombok.Data;
+
+/** Cursor MCP 一键安装链接响应。 */
+@Data
+public class ShareCursorInstallRes {
+    private String serverName;
+    private String deeplink;
+    private String configJson;
+}

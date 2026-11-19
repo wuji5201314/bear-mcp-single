@@ -4,13 +4,13 @@
          xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 https://maven.apache.org/xsd/maven-4.0.0.xsd">
     <modelVersion>4.0.0</modelVersion>
 
-    <groupId>com.bear.mcp</groupId>
-    <artifactId>bear-mcp-single</artifactId>
+    <groupId>com.mcpforge</groupId>
+    <artifactId>mcpforge</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>jar</packaging>
 
-    <name>Bear MCP Single</name>
-    <description>Single-module MCP server learning edition</description>
+    <name>MCPForge</name>
+    <description>Self-hosted MCP server with a visual governance console</description>
 
     <parent>
         <groupId>org.springframework.boot</groupId>
@@ -141,7 +141,7 @@
     </dependencies>
 
     <build>
-        <finalName>bear-mcp-single</finalName>
+        <finalName>mcpforge</finalName>
         <plugins>
             <plugin>
                 <groupId>org.springframework.boot</groupId>

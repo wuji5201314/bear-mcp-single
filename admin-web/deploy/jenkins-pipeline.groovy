@@ -8,10 +8,10 @@ pipeline {
   }
 
   environment {
-    APP_NAME = 'bear-mcp-admin-web'
-    IMAGE_NAME = 'bear-mcp-admin-web'
-    DEPLOY_DIR = '/data/xxx/projects/bear-mcp-admin-web'
-    COMPOSE_FILE = '/data/xxx/projects/bear-mcp-admin-web/docker-compose.yml'
+    APP_NAME = 'mcpforge-admin-web'
+    IMAGE_NAME = 'mcpforge-admin-web'
+    DEPLOY_DIR = '/data/xxx/projects/mcpforge-admin-web'
+    COMPOSE_FILE = '/data/xxx/projects/mcpforge-admin-web/docker-compose.yml'
     DOCKER_NETWORK = 'xxx-network'
   }
 
@@ -78,7 +78,7 @@ pipeline {
         sh '''
           set -eu
           cd "$DEPLOY_DIR"
-          BEAR_MCP_ADMIN_WEB_IMAGE="$IMAGE_NAME:$BUILD_NUMBER" docker compose up -d
+          MCPFORGE_ADMIN_WEB_IMAGE="$IMAGE_NAME:$BUILD_NUMBER" docker compose up -d
           docker compose ps
 
           if [ "$(docker inspect -f '{{.State.Running}}' "$APP_NAME")" != 'true' ]; then
@@ -93,10 +93,10 @@ pipeline {
 
   post {
     success {
-      echo 'Bear MCP Admin Web 部署完成：http://YOUR_SERVER_HOST:8091/'
+      echo 'MCPForge Admin Web 部署完成：http://YOUR_SERVER_HOST:8091/'
     }
     failure {
-      echo 'Bear MCP Admin Web 部署失败，请查看 Jenkins 控制台日志。'
+      echo 'MCPForge Admin Web 部署失败，请查看 Jenkins 控制台日志。'
     }
   }
 }

@@ -1,6 +1,6 @@
 # student 表 DDL（示例）
 
-> 示例 Resource：演示 Bear MCP 的 `bear://xxx/...` 资源命名与 DDL 文档格式。
+> 示例 Resource：演示 MCPForge 的 `mcpforge://xxx/...` 资源命名与 DDL 文档格式。
 > 该表只存在于演示库，与本仓库运行环境无关。
 
 ```sql

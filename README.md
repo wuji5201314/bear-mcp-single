@@ -1,4 +1,4 @@
-# Bear MCP Single
+# MCPForge
 
 一个自托管（single-node）的 MCP Server：把 HTTP 接口、Groovy 动态脚本、数据库、Prompt 模板、Skill 与静态资源统一注册成 MCP Tool / Prompt / Resource，并带一个 Vue3 管理后台做可视化编排。
 
@@ -8,7 +8,7 @@
 
 ## 在线预览
 
-不想装环境，想先看界面：**https://wuji5201314.github.io/bear-mcp-single/**
+不想装环境，想先看界面：**https://wuji5201314.github.io/mcpforge/**
 
 这是纯前端 demo 构建（`npm run build:demo`），浏览器内 mock 了全部接口，数据是合成的，登录页账号已预填，点一下就能逛完整后台。生产构建不包含这层 mock。
 
@@ -34,7 +34,7 @@
 ## 目录结构
 
 ```
-src/main/java/com/bear/mcp/single
+src/main/java/com/mcpforge
 ├── admin/          管理端接口（用户、角色、Token、审计）
 ├── gateway/        MCP 协议过滤器（鉴权、tools/prompts/resources 分流）
 ├── core/
@@ -59,8 +59,8 @@ deploy/             后端容器化与 CI 示例
 ### 1. 初始化数据库
 
 ```bash
-mysql -u root -p -e "CREATE DATABASE bear_mcp_single DEFAULT CHARSET utf8mb4;"
-mysql -u root -p bear_mcp_single < db/init.sql
+mysql -u root -p -e "CREATE DATABASE mcpforge DEFAULT CHARSET utf8mb4;"
+mysql -u root -p mcpforge < db/init.sql
 ```
 
 `db/init.sql` 会建表并写入一套演示数据：管理员 `demo-admin`、演示 Token、示例请求配置与动态工具。
@@ -70,9 +70,9 @@ mysql -u root -p bear_mcp_single < db/init.sql
 
 ```bash
 # 依赖：JDK 17、Maven 3.8+
-export BEAR_MYSQL_URL='jdbc:mysql://localhost:3306/bear_mcp_single?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai'
-export BEAR_MYSQL_USERNAME=root
-export BEAR_MYSQL_PASSWORD=your_password
+export MCPFORGE_MYSQL_URL='jdbc:mysql://localhost:3306/mcpforge?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=Asia/Shanghai'
+export MCPFORGE_MYSQL_USERNAME=root
+export MCPFORGE_MYSQL_PASSWORD=your_password
 
 mvn spring-boot:run
 ```
@@ -121,12 +121,12 @@ curl -s http://localhost:8090/mcp \
 
 | 变量 | 说明 | 默认 |
 | --- | --- | --- |
-| `BEAR_MYSQL_URL` / `BEAR_MYSQL_USERNAME` / `BEAR_MYSQL_PASSWORD` | 业务库连接 | 本地 `localhost:3306/bear_mcp_single` |
+| `MCPFORGE_MYSQL_URL` / `MCPFORGE_MYSQL_USERNAME` / `MCPFORGE_MYSQL_PASSWORD` | 业务库连接 | 本地 `localhost:3306/mcpforge` |
 | `REDIS_HOST` / `REDIS_PORT` / `REDIS_PASSWORD` | Redis 连接 | `localhost:6379` |
-| `BEAR_ADMIN_JWT_SECRET` | 管理端 JWT 签名密钥，务必替换 | `change-me-in-production` |
-| `BEAR_MCP_DEMO_TOKEN` | 演示 Token（仅用于本地联调） | `mcp_dev_token` |
-| `BEAR_REPOSITORY_ROOT` | 代码仓库工具可读的根目录（只读挂载） | `/data/repositories` |
-| `BEAR_TOS_*` | 对象存储（可选，未配置则资源存库） | 空 |
+| `MCPFORGE_ADMIN_JWT_SECRET` | 管理端 JWT 签名密钥，务必替换 | `change-me-in-production` |
+| `MCPFORGE_MCP_DEMO_TOKEN` | 演示 Token（仅用于本地联调） | `mcp_dev_token` |
+| `MCPFORGE_REPOSITORY_ROOT` | 代码仓库工具可读的根目录（只读挂载） | `/data/repositories` |
+| `MCPFORGE_TOS_*` | 对象存储（可选，未配置则资源存库） | 空 |
 | `FEISHU_APP_ID` / `FEISHU_APP_SECRET` | 飞书 MCP 接入（可选） | 空 |
 | `VOLCENGINE_*` | 日志服务接入（可选） | 空 |
 

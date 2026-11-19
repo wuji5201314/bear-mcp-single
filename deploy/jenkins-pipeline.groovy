@@ -8,10 +8,10 @@ pipeline {
   }
 
   environment {
-    APP_NAME = 'bear-mcp-single'
-    IMAGE_NAME = 'bear-mcp-single'
-    DEPLOY_DIR = '/data/xxx/projects/bear-mcp-single'
-    COMPOSE_FILE = '/data/xxx/projects/bear-mcp-single/docker-compose.yml'
+    APP_NAME = 'mcpforge'
+    IMAGE_NAME = 'mcpforge'
+    DEPLOY_DIR = '/data/xxx/projects/mcpforge'
+    COMPOSE_FILE = '/data/xxx/projects/mcpforge/docker-compose.yml'
     DOCKER_NETWORK = 'xxx-network'
   }
 
@@ -77,7 +77,7 @@ pipeline {
         sh '''
           set -eu
           cd "$DEPLOY_DIR"
-          BEAR_MCP_SINGLE_IMAGE="$IMAGE_NAME:$BUILD_NUMBER" docker compose up -d
+          MCPFORGE_IMAGE="$IMAGE_NAME:$BUILD_NUMBER" docker compose up -d
           docker compose ps
 
           if [ "$(docker inspect -f '{{.State.Running}}' "$APP_NAME")" != 'true' ]; then
@@ -92,10 +92,10 @@ pipeline {
 
   post {
     success {
-      echo 'Bear MCP Single 部署完成：http://YOUR_SERVER_HOST:8090/admin'
+      echo 'MCPForge Single 部署完成：http://YOUR_SERVER_HOST:8090/admin'
     }
     failure {
-      echo 'Bear MCP Single 部署失败，请查看 Jenkins 控制台日志。'
+      echo 'MCPForge Single 部署失败，请查看 Jenkins 控制台日志。'
     }
   }
 }

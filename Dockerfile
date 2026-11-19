@@ -30,13 +30,13 @@ RUN apk add --no-cache \
         ripgrep \
         sed \
         coreutils \
-    && addgroup -S bear \
-    && adduser -S bear -G bear
+    && addgroup -S mcpforge \
+    && adduser -S mcpforge -G mcpforge
 
-COPY --from=backend-builder /workspace/target/bear-mcp-single.jar /app/bear-mcp-single.jar
+COPY --from=backend-builder /workspace/target/mcpforge.jar /app/mcpforge.jar
 
-USER bear
+USER mcpforge
 
 EXPOSE 8090
 
-ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/bear-mcp-single.jar"]
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/mcpforge.jar"]
